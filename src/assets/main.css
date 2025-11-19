@@ -1,0 +1,190 @@
+@import 'tailwindcss';
+
+:root {
+  --header-height: 64px;
+}
+
+body {
+  margin: 0;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Open Sans',
+    'Helvetica Neue',
+    sans-serif;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
+  color: #334155;
+  line-height: 1.6;
+  min-height: 100vh;
+  padding-top: var(--header-height);
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 5px;
+  border: 2px solid #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* 代码高亮 */
+.hljs {
+  background: #1e1e1e !important;
+  color: #d4d4d4 !important;
+  padding: 12px !important;
+  border-radius: 6px !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.hljs-keyword {
+  color: #569cd6 !important;
+}
+
+.hljs-string {
+  color: #ce9178 !important;
+}
+
+.hljs-comment {
+  color: #6a9955 !important;
+  font-style: italic !important;
+}
+
+.hljs-number {
+  color: #b5cea8 !important;
+}
+
+.hljs-function {
+  color: #dcdcaa !important;
+}
+
+.hljs-title {
+  color: #dcdcaa !important;
+}
+
+.hljs-built_in {
+  color: #4ec9b0 !important;
+}
+
+/* Element Plus 覆盖 */
+.el-card__body {
+  padding: 16px !important;
+}
+
+.el-dialog {
+  border-radius: 16px !important;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.el-button {
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+}
+
+.el-tag {
+  border-radius: 12px !important;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  body {
+    padding-top: var(--header-height);
+  }
+
+  .session-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .code-section {
+    padding-right: 0 !important;
+  }
+
+  .action-buttons {
+    position: sticky !important;
+    bottom: 0 !important;
+    background: white !important;
+    padding: 16px !important;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05) !important;
+  }
+}
+/* Monaco Editor 全局样式 */
+.monaco-editor {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace !important;
+}
+
+.monaco-editor .margin {
+  background-color: #252526 !important;
+}
+
+.monaco-editor .line-numbers {
+  color: #6e7681 !important;
+  width: 40px !important;
+}
+
+.monaco-editor .cursor {
+  background-color: #fff !important;
+}
+
+/* 滚动条样式优化 */
+.monaco-editor .overflow-guard {
+  scrollbar-width: thin;
+  scrollbar-color: #60a5fa #1e1e1e;
+}
+
+.monaco-editor .overflow-guard::-webkit-scrollbar {
+  width: 8px;
+}
+
+.monaco-editor .overflow-guard::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.monaco-editor .overflow-guard::-webkit-scrollbar-thumb {
+  background: #60a5fa;
+  border-radius: 4px;
+}
+
+.monaco-editor .overflow-guard::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}
+
+/* 修复 MonacoEditor 样式问题 */
+.monaco-editor {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.monaco-editor .margin {
+  background-color: #252526 !important;
+}
+
+.monaco-editor .view-line {
+  line-height: 1.5 !important;
+}
+
+/* 修复滚动条在某些浏览器中的问题 */
+.monaco-editor .overflow-guard {
+  overflow: hidden !important;
+}

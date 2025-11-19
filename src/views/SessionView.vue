@@ -1,0 +1,1432 @@
+<script setup>
+import { ref, onMounted, onUnmounted, computed, watch, h, toRaw, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { EventSourcePolyfill } from 'event-source-polyfill'
+import { useAuthStore } from '@/stores/auth'
+import { getSessionById, updateSession, deleteSession } from '@/api/sessions'
+import { stopContinuousDiff as apiStopContinuousDiff } from '@/api/diff'
+import { generateCode as apiGenerateCode } from '@/api/ai'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import MonacoEditor from 'vue-monaco'
+import TestcaseCard from '@/components/TestcaseCard.vue'
+// 正确导入图标
+import {
+  ArrowLeftBold as ArrowLeftBoldIcon,
+  Refresh as RefreshIcon,
+  VideoPlay as VideoPlayIcon,
+  Close as CloseIcon,
+  Document as DocumentIcon,
+  DocumentChecked as DocumentCheckedIcon,
+  Warning as WarningIcon,
+  FolderOpened as FolderOpenedIcon,
+  Delete as DeleteIcon,
+  House as HouseIcon,
+  MagicStick as MagicStickIcon,
+  User as UserIcon,
+  SuccessFilled as SuccessFilledIcon,
+  DataAnalysis as DataAnalysisIcon,
+  Tickets as TicketsIcon,
+  Edit as EditIcon,
+} from '@element-plus/icons-vue'
+
+MonacoEditor.render = () => h('div')
+
+const route = useRoute()
+const router = useRouter()
+const sessionId = ref(route.params.id)
+const session = ref(null)
+const loading = ref(true)
+const isGenerating = ref(false)
+const generatedCount = ref(0)
+const lastError = ref(false)
+const lastErrorIndex = ref(-1)
+const hasUnsavedChanges = ref(false)
+let sseClient = null
+let saveTimeout = null
+
+const authStore = useAuthStore()
+
+// 新增编辑器引用
+const genEditor = ref(null)
+const stdEditor = ref(null)
+const userEditor = ref(null)
+
+const diffFailed = ref(false)
+const failureMessage = ref('')
+const failureDetail = ref('')
+
+// 语言选项
+const languageOptions = [
+  { value: 'cpp', label: 'C++', versions: ['c++11', 'c++14', 'c++17', 'c++20'] },
+  { value: 'c', label: 'C', versions: ['c99', 'c11', 'c17'] },
+]
+
+// 语言和版本选择
+const genLanguage = computed({
+  get: () => session.value?.gen_code?.lang || 'cpp',
+  set: (value) => {
+    if (session.value) {
+      if (!session.value.gen_code) {
+        session.value.gen_code = { lang: value, std: 'c++17', content: '' }
+      } else {
+        session.value.gen_code.lang = value
+      }
+    }
+    markUnsaved()
+  },
+})
+
+const genVersion = computed({
+  get: () => session.value?.gen_code?.std || 'c++17',
+  set: (value) => {
+    if (session.value) {
+      if (!session.value.gen_code) {
+        session.value.gen_code = { lang: 'cpp', std: value, content: '' }
+      } else {
+        session.value.gen_code.std = value
+      }
+    }
+    markUnsaved()
+  },
+})
+
+const stdLanguage = computed({
+  get: () => session.value?.std_code?.lang || 'cpp',
+  set: (value) => {
+    if (session.value) {
+      if (!session.value.std_code) {
+        session.value.std_code = { lang: value, std: 'c++17', content: '' }
+      } else {
+        session.value.std_code.lang = value
+      }
+    }
+    markUnsaved()
+  },
+})
+
+const stdVersion = computed({
+  get: () => session.value?.std_code?.std || 'c++17',
+  set: (value) => {
+    if (session.value) {
+      if (!session.value.std_code) {
+        session.value.std_code = { lang: 'cpp', std: value, content: '' }
+      } else {
+        session.value.std_code.std = value
+      }
+    }
+    markUnsaved()
+  },
+})
+
+const userLanguage = computed({
+  get: () => session.value?.user_code?.lang || 'cpp',
+  set: (value) => {
+    if (session.value) {
+      if (!session.value.user_code) {
+        session.value.user_code = { lang: value, std: 'c++17', content: '' }
+      } else {
+        session.value.user_code.lang = value
+      }
+    }
+    markUnsaved()
+  },
+})
+
+const userVersion = computed({
+  get: () => session.value?.user_code?.std || 'c++17',
+  set: (value) => {
+    if (session.value) {
+      if (!session.value.user_code) {
+        session.value.user_code = { lang: 'cpp', std: value, content: '' }
+      } else {
+        session.value.user_code.std = value
+      }
+    }
+    markUnsaved()
+  },
+})
+
+const currentStatus = ref('Ready')
+
+const statusColor = computed(() => {
+  if (currentStatus.value.includes('error') || currentStatus.value.includes('failed')) {
+    return 'text-red-500 bg-red-50'
+  }
+  if (currentStatus.value.includes('success') || currentStatus.value.includes('completed')) {
+    return 'text-green-500 bg-green-50'
+  }
+  if (currentStatus.value.includes('pending') || currentStatus.value.includes('starting')) {
+    return 'text-blue-500 bg-blue-50'
+  }
+  return 'text-yellow-500 bg-yellow-50'
+})
+
+// 关键修复：确保计算属性正确工作
+const safeDescription = computed({
+  get: () => session.value?.description || '',
+  set: (value) => {
+    if (session.value) {
+      session.value.description = String(value || '')
+      markUnsaved()
+    }
+  },
+})
+
+// 重构 markUnsaved，简化逻辑
+const markUnsaved = () => {
+  hasUnsavedChanges.value = true
+  if (saveTimeout) clearTimeout(saveTimeout)
+  saveTimeout = setTimeout(saveSession, 10000)
+}
+
+// 添加编辑标题方法
+const editSessionTitle = () => {
+  ElMessageBox.prompt('Enter new session title:', 'Edit Session Title', {
+    confirmButtonText: 'Confirm',
+    cancelButtonText: 'Cancel',
+    inputValue: session.value?.title || '',
+    inputErrorMessage: 'Title cannot be empty',
+    inputValidator: (value) => {
+      if (!value?.trim()) {
+        return 'Title cannot be empty'
+      }
+      return null
+    },
+  })
+    .then(async ({ value }) => {
+      const newTitle = value.trim()
+      if (newTitle === session.value?.title) {
+        return
+      }
+
+      // 更新本地数据
+      session.value.title = newTitle
+      markUnsaved()
+
+      // 立即保存
+      await saveSession()
+
+      ElMessage.success('Session title updated successfully')
+    })
+    .catch(() => {
+      ElMessage.info('Title edit canceled')
+    })
+}
+
+const onGenEditorMounted = (editor) => {
+  genEditor.value = editor
+}
+
+const onStdEditorMounted = (editor) => {
+  stdEditor.value = editor
+}
+
+const onUserEditorMounted = (editor) => {
+  userEditor.value = editor
+}
+
+const handleGenCodeInput = (value) => {
+  if (session.value?.gen_code) {
+    // const content = getEditorContent(value)
+    // session.value.gen_code.content = content
+    // markFieldDirty('gen_code')
+    markUnsaved()
+  }
+}
+
+const handleStdCodeInput = (value) => {
+  if (session.value?.std_code) {
+    // const content = getEditorContent(value)
+    // session.value.std_code.content = content
+    // markFieldDirty('std_code')
+    markUnsaved()
+  }
+}
+
+const handleUserCodeInput = (value) => {
+  if (session.value?.user_code) {
+    // const content = getEditorContent(value)
+    // session.value.user_code.content = content
+    // markFieldDirty('user_code')
+    markUnsaved()
+  }
+}
+
+const saveSession = async () => {
+  if (!hasUnsavedChanges.value || !session.value) return
+
+  try {
+    loading.value = true
+
+    // 从编辑器获取当前内容
+    session.value.gen_code.content = toRaw(genEditor.value).getValue()
+    session.value.std_code.content = toRaw(stdEditor.value).getValue()
+    session.value.user_code.content = toRaw(userEditor.value).getValue()
+
+    // 构建更新数据
+    const updateData = {
+      title: String(session.value.title || ''),
+      description: String(session.value.description || ''),
+      gen_code: {
+        lang: String(session.value.gen_code?.lang || 'cpp'),
+        std: String(session.value.gen_code?.std || 'c++17'),
+        content: String(session.value.gen_code?.content || ''),
+      },
+      std_code: {
+        lang: String(session.value.std_code?.lang || 'cpp'),
+        std: String(session.value.std_code?.std || 'c++17'),
+        content: String(session.value.std_code?.content || ''),
+      },
+      user_code: {
+        lang: String(session.value.user_code?.lang || 'cpp'),
+        std: String(session.value.user_code?.std || 'c++17'),
+        content: String(session.value.user_code?.content || ''),
+      },
+    }
+
+    await updateSession(session.value.id, updateData)
+    hasUnsavedChanges.value = false
+    ElMessage.success('Session saved successfully')
+  } catch (error) {
+    console.error('Save error:', error)
+    ElMessage.error(`Failed to save session: ${error.message || 'Unknown error'}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+const fetchSession = async () => {
+  try {
+    loading.value = true
+    const response = await getSessionById(sessionId.value)
+
+    // 确保数据结构完整
+    const sessionData = response.data
+
+    // 确保代码字段存在
+    if (!sessionData.user_code) {
+      sessionData.user_code = {
+        lang: 'cpp',
+        std: 'c++17',
+        content:
+          '// Enter your code here\n#include <iostream>\nusing namespace std;\n\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}',
+      }
+    }
+
+    if (!sessionData.std_code) {
+      sessionData.std_code = {
+        lang: 'cpp',
+        std: 'c++17',
+        content:
+          '// Standard solution\n#include <iostream>\nusing namespace std;\n\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}',
+      }
+    }
+
+    if (!sessionData.gen_code) {
+      sessionData.gen_code = {
+        lang: 'cpp',
+        std: 'c++17',
+        content:
+          '// Test data generator\n#include <iostream>\n#include <random>\nusing namespace std;\n\nint main() {\n    random_device rd;\n    mt19937 gen(rd());\n    uniform_int_distribution<> dis(1, 100);\n    \n    int a = dis(gen);\n    int b = dis(gen);\n    cout << a << " " << b << endl;\n    return 0;\n}',
+      }
+    }
+
+    if (!sessionData.test_cases) {
+      sessionData.test_cases = []
+    }
+
+    session.value = sessionData
+  } catch (error) {
+    ElMessage.error(`Failed to load session: ${error.message}`)
+    router.push('/')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 关键修复：确保 test_cases 是响应式数组
+const ensureTestCases = () => {
+  if (!session.value.test_cases) {
+    session.value.test_cases = []
+  }
+  // 强制 Vue 重新追踪响应性
+  session.value = { ...session.value, test_cases: [...session.value.test_cases] }
+}
+
+const resetDiffState = () => {
+  diffFailed.value = false
+  failureMessage.value = ''
+  failureDetail.value = ''
+  currentStatus.value = 'Ready'
+  // 重置测试用例
+  if (session.value) {
+    session.value.test_cases = []
+  }
+}
+
+// 新增 SSE 事件处理函数
+const handleSSEStatus = (data) => {
+  currentStatus.value = data.status || 'Unknown status'
+  console.log('Current status:', currentStatus.value)
+}
+
+const handleSSEError = (data) => {
+  currentStatus.value = `Error: ${data.message || 'Unknown error'}`
+  lastError.value = true
+  ElMessage.error(`SSE Error: ${data.message || 'Unknown error'}`)
+}
+
+const handleSSETestResult = async (data) => {
+  console.log('Test result received:', data)
+
+  if (!data.test_case) {
+    console.error('Missing test_case in SSE data:', data)
+    return
+  }
+
+  // 确保 test_cases 存在且是响应式的
+  ensureTestCases()
+
+  try {
+    // 创建新测试用例的响应式副本
+    console.log(data)
+    const newTestCase = {
+      id: data.test_case.id || Date.now(),
+      status: data.test_case.status || 'PENDING',
+      input: data.test_case.input || '',
+      output: data.test_case.output || '',
+      answer: data.test_case.answer || '',
+      time_used: data.test_case.time_used || 0,
+      memory_used: data.test_case.memory_used || 0,
+      created_at: data.test_case.created_at || new Date().toISOString(),
+    }
+
+    // 使用 Vue.set 确保响应性
+    session.value.test_cases.push(newTestCase)
+    generatedCount.value = data.test_num || generatedCount.value + 1
+
+    console.log('Test cases count:', session.value.test_cases.length)
+
+    // 滚动到底部
+    await nextTick()
+    scrollToBottom()
+  } catch (error) {
+    console.error('Error processing test result:', error)
+    ElMessage.warning('Failed to process test result')
+  }
+}
+
+const handleSSEFinish = () => {
+  currentStatus.value = 'Continuous diff finished'
+  ElMessage.success('Continuous diff finished successfully!')
+  stopContinuousGeneration()
+}
+
+const handleSSEFailed = (data) => {
+  console.error('Diff failed:', data)
+
+  diffFailed.value = true
+  currentStatus.value = 'Continuous diff failed'
+  failureMessage.value = data.message || 'Unknown error occurred'
+  failureDetail.value = data.detail || ''
+
+  // 停止生成
+  stopContinuousGeneration()
+
+  // 显示错误消息
+  ElMessage.error(`Continuous diff failed: ${failureMessage.value}`)
+}
+
+// 滚动到底部
+const scrollToBottom = () => {
+  nextTick(() => {
+    const container = document.querySelector('.test-cases-container')
+    if (container) {
+      container.scrollTop = container.scrollHeight
+      console.log('Scrolled to bottom, scrollTop:', container.scrollTop)
+    } else {
+      console.warn('Test cases container not found')
+    }
+  })
+}
+
+// 重新获取会话数据
+const refreshSessionData = async () => {
+  try {
+    const response = await getSessionById(sessionId.value)
+    session.value = response.data
+  } catch (error) {
+    console.error('Failed to refresh session data:', error)
+    ElMessage.error('Failed to refresh session data')
+  }
+}
+
+const startContinuousGeneration = async () => {
+  if (isGenerating.value || !session.value) return
+
+  // 保存未保存的更改
+  if (hasUnsavedChanges.value) {
+    const result = await ElMessageBox.confirm(
+      'You have unsaved changes. Do you want to save them before starting?',
+      'Unsaved Changes',
+      {
+        confirmButtonText: 'Save and Start',
+        cancelButtonText: 'Start Without Saving',
+        type: 'warning',
+      },
+    ).catch(() => false)
+
+    if (result === 'confirm') {
+      await saveSession()
+    } else if (result === false) {
+      return
+    }
+  }
+
+  // 清除旧的测试用例
+  session.value.test_cases = []
+  // 强制 Vue 重新追踪
+  session.value = { ...session.value }
+
+  session.value.test_cases = []
+  currentStatus.value = 'Starting continuous diff...'
+  isGenerating.value = true
+  generatedCount.value = 0
+  lastError.value = false
+  lastErrorIndex.value = -1
+
+  try {
+    // 获取 token
+    const token = authStore.token
+    if (!token) {
+      throw new Error('Authentication required. Please login again.')
+    }
+
+    // 使用 EventSourcePolyfill
+    const sseUrl = `${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/start`
+
+    const body = JSON.stringify({
+      max_tests: 100,
+      stop_on_fail: true,
+    })
+
+    sseClient = new EventSourcePolyfill(sseUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      heartbeatTimeout: 30000,
+      connectionTimeout: 10000,
+      fetchOptions: {
+        method: 'POST',
+        body: body,
+      },
+    })
+
+    // 事件监听
+    sseClient.addEventListener('status', (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        handleSSEStatus(data)
+      } catch (e) {
+        console.error('Error parsing status event:', e)
+      }
+    })
+
+    sseClient.addEventListener('failed', (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        handleSSEFailed(data)
+      } catch (e) {
+        console.error('Error parsing failed event:', e)
+        handleSSEFailed({ message: 'Failed to parse error message', detail: event.data })
+      }
+    })
+
+    sseClient.addEventListener('error', (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        handleSSEError(data)
+      } catch (e) {
+        console.error('Error parsing error event:', e)
+      }
+    })
+
+    sseClient.addEventListener('test_result', (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        handleSSETestResult(data)
+      } catch (e) {
+        console.error('Error parsing test_result event:', e)
+      }
+    })
+
+    sseClient.addEventListener('finish', () => {
+      handleSSEFinish()
+    })
+
+    // 连接错误
+    sseClient.onerror = (error) => {
+      console.error('SSE connection error:', error)
+
+      let errorMessage = 'Connection error during continuous diff'
+
+      if (
+        error?.status === 401 ||
+        error?.message?.includes('401') ||
+        error?.message?.includes('Unauthorized')
+      ) {
+        errorMessage = 'Authentication failed. Please login again.'
+        authStore.logout()
+        router.push('/login')
+      } else if (error?.status === 403) {
+        errorMessage = "You don't have permission to access this session."
+      } else if (error?.status >= 500) {
+        errorMessage = 'Server error. Please try again later.'
+      }
+
+      currentStatus.value = `Error: ${errorMessage}`
+      ElMessage.error(errorMessage)
+      stopContinuousGeneration()
+    }
+
+    // 连接成功
+    sseClient.onopen = () => {
+      console.log('SSE connection established with custom headers')
+      currentStatus.value = 'Connection established. Starting tests...'
+    }
+  } catch (error) {
+    console.error('Failed to start continuous diff:', error)
+    currentStatus.value = `Error: ${error.message || 'Unknown error'}`
+    ElMessage.error(`Failed to start continuous diff: ${error.message || 'Unknown error'}`)
+    stopContinuousGeneration()
+  }
+}
+
+const stopContinuousGeneration = () => {
+  isGenerating.value = false
+  if (sseClient) {
+    sseClient.close()
+    sseClient = null
+  }
+
+  // 调用后端 API 停止
+  apiStopContinuousDiff(sessionId.value).catch((error) => {
+    console.error('Failed to stop continuous diff:', error)
+    ElMessage.warning('Failed to stop continuous diff on server')
+  })
+}
+
+const testExistingData = async () => {
+  if (isGenerating.value || !session.value) return
+
+  if (!session.value || !session.value.test_cases || session.value.test_cases.length === 0) {
+    ElMessage.warning('No test cases to rerun')
+    return
+  }
+
+  // 保存未保存的更改
+  if (hasUnsavedChanges.value) {
+    const result = await ElMessageBox.confirm(
+      'You have unsaved changes. Do you want to save them before rerunning?',
+      'Unsaved Changes',
+      {
+        confirmButtonText: 'Save and Start',
+        cancelButtonText: 'Start Without Saving',
+        type: 'warning',
+      },
+    ).catch(() => false)
+
+    if (result === 'confirm') {
+      await saveSession()
+    } else if (result === false) {
+      return
+    }
+  }
+
+  // 清除旧的测试用例
+  session.value.test_cases = []
+  // 强制 Vue 重新追踪
+  session.value = { ...session.value }
+
+  session.value.test_cases = []
+  currentStatus.value = 'Rerunning existing testcases...'
+  isGenerating.value = true
+  generatedCount.value = 0
+  lastError.value = false
+  lastErrorIndex.value = -1
+
+  try {
+    // 获取 token
+    const token = authStore.token
+    if (!token) {
+      throw new Error('Authentication required. Please login again.')
+    }
+
+    // 使用 EventSourcePolyfill
+    const sseUrl = `${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/rerun`
+
+    const body = JSON.stringify({
+      max_tests: 100,
+      stop_on_fail: true,
+    })
+
+    sseClient = new EventSourcePolyfill(sseUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      heartbeatTimeout: 30000,
+      connectionTimeout: 10000,
+      fetchOptions: {
+        method: 'POST',
+        body: body,
+      },
+    })
+
+    // 事件监听
+    sseClient.addEventListener('status', (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        handleSSEStatus(data)
+      } catch (e) {
+        console.error('Error parsing status event:', e)
+      }
+    })
+
+    sseClient.addEventListener('failed', (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        handleSSEError(data)
+      } catch (e) {
+        console.error('Error parsing error event:', e)
+      }
+    })
+
+    sseClient.addEventListener('failed', (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        handleSSEFailed(data)
+      } catch (e) {
+        console.error('Error parsing failed event:', e)
+        handleSSEFailed({ message: 'Failed to parse error message', detail: event.data })
+      }
+    })
+
+    sseClient.addEventListener('test_result', (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        handleSSETestResult(data)
+      } catch (e) {
+        console.error('Error parsing test_result event:', e)
+      }
+    })
+
+    sseClient.addEventListener('finish', () => {
+      handleSSEFinish()
+    })
+
+    // 连接错误
+    sseClient.onerror = (error) => {
+      console.error('SSE connection error:', error)
+
+      let errorMessage = 'Connection error during rerunning'
+
+      if (
+        error?.status === 401 ||
+        error?.message?.includes('401') ||
+        error?.message?.includes('Unauthorized')
+      ) {
+        errorMessage = 'Authentication failed. Please login again.'
+        authStore.logout()
+        router.push('/login')
+      } else if (error?.status === 403) {
+        errorMessage = "You don't have permission to access this session."
+      } else if (error?.status >= 500) {
+        errorMessage = 'Server error. Please try again later.'
+      }
+
+      currentStatus.value = `Error: ${errorMessage}`
+      ElMessage.error(errorMessage)
+      stopContinuousGeneration()
+    }
+
+    // 连接成功
+    sseClient.onopen = () => {
+      console.log('SSE connection established with custom headers')
+      currentStatus.value = 'Connection established. Starting tests...'
+    }
+  } catch (error) {
+    console.error('Failed to rerun existing testcases:', error)
+    currentStatus.value = `Error: ${error.message || 'Unknown error'}`
+    ElMessage.error(`Failed to rerun existing testcases: ${error.message || 'Unknown error'}`)
+    stopContinuousGeneration()
+  }
+}
+
+const deleteSessionConfirm = () => {
+  ElMessageBox.confirm(
+    'Are you sure you want to delete this session? All data will be permanently lost.',
+    'Confirm Deletion',
+    {
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+      type: 'warning',
+    },
+  )
+    .then(async () => {
+      try {
+        await deleteSession(sessionId.value)
+        ElMessage.success('Session deleted successfully')
+        router.push('/')
+      } catch (error) {
+        ElMessage.error(`Failed to delete session: ${error.message}`)
+      }
+    })
+    .catch(() => {
+      ElMessage.info('Deletion canceled')
+    })
+}
+
+const generateCode = async (type) => {
+  if (!session.value || !sessionId.value) {
+    ElMessage.warning('Session not loaded')
+    return
+  }
+
+  try {
+    loading.value = true
+    ElMessage.info(`Generating ${type} code with AI...`)
+
+    // 调用后端 API 生成代码
+    const response = await apiGenerateCode(type, sessionId.value)
+    if (!response.data || !response.data.generated_code) {
+      throw new Error('Invalid response from AI service')
+    }
+
+    const generated = response.data
+
+    // 根据类型更新不同的代码区域
+    if (type === 'generator') {
+      if (!session.value.gen_code) {
+        session.value.gen_code = {
+          lang: generated.lang || 'cpp',
+          std: generated.std || 'c++17',
+          content: generated.generated_code,
+        }
+      } else {
+        session.value.gen_code.content = generated.generated_code
+        session.value.gen_code.lang = generated.lang || 'cpp'
+        session.value.gen_code.std = generated.std || 'c++17'
+      }
+
+      // 如果有编辑器实例，更新内容
+      if (genEditor.value) {
+        toRaw(genEditor.value).setValue(generated.generated_code)
+      }
+    } else if (type === 'standard') {
+      if (!session.value.std_code) {
+        session.value.std_code = {
+          lang: generated.lang || 'cpp',
+          std: generated.std || 'c++17',
+          content: generated.generated_code,
+        }
+      } else {
+        session.value.std_code.content = generated.generated_code
+        session.value.std_code.lang = generated.lang || 'cpp'
+        session.value.std_code.std = generated.std || 'c++17'
+      }
+
+      if (stdEditor.value) {
+        toRaw(stdEditor.value).setValue(generated.generated_code)
+      }
+    }
+
+    // 标记为未保存
+    markUnsaved()
+
+    ElMessage.success(
+      `${type === 'generator' ? 'Generator' : 'Standard'} code generated successfully!`,
+    )
+  } catch (error) {
+    console.error(`AI generation failed:`, error)
+    let errorMessage = 'AI generation failed'
+    if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+    ElMessage.error(errorMessage)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(async () => {
+  // 关键修复：确保在加载 session 前配置 Monaco
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  fetchSession()
+
+  // 监听页面关闭，提醒保存
+  window.addEventListener('beforeunload', (e) => {
+    if (hasUnsavedChanges.value) {
+      e.preventDefault()
+      e.returnValue = 'You have unsaved changes. Are you sure you want to leave?'
+    }
+  })
+})
+
+onUnmounted(() => {
+  if (sseClient) {
+    sseClient.close()
+  }
+  if (saveTimeout) clearTimeout(saveTimeout)
+  window.removeEventListener('beforeunload', () => {})
+  diffFailed.value = false
+})
+</script>
+
+<template>
+  <div class="container mx-auto px-4 py-6 max-w-6xl">
+    <div class="flex items-center justify-between mb-8">
+      <div class="flex items-center gap-4">
+        <el-button
+          @click="router.push('/')"
+          circle
+          class="shadow-md hover:shadow-lg transition-shadow"
+        >
+          <el-icon size="20"><ArrowLeftBoldIcon /></el-icon>
+        </el-button>
+        <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
+          <el-icon class="text-blue-500 text-3xl"><DocumentIcon /></el-icon>
+          <span>{{ session?.title || 'Loading session...' }}</span>
+        </h1>
+      </div>
+      <div class="flex items-center gap-3">
+        <el-button
+          v-if="hasUnsavedChanges"
+          type="warning"
+          @click="saveSession"
+          :loading="loading"
+          class="px-4 py-2"
+        >
+          <el-icon class="mr-1"><EditIcon /></el-icon>
+          Save Changes
+        </el-button>
+
+        <el-button
+          type="primary"
+          @click="editSessionTitle"
+          class="hidden md:flex px-5 py-2 text-lg font-medium"
+        >
+          <el-icon class="mr-2 text-lg"><EditIcon /></el-icon>
+          Edit Title
+        </el-button>
+
+        <el-button
+          type="danger"
+          @click="deleteSessionConfirm"
+          class="hidden md:flex px-5 py-2 text-lg font-medium"
+        >
+          <el-icon class="mr-2 text-lg"><DeleteIcon /></el-icon>
+          Delete Session
+        </el-button>
+      </div>
+    </div>
+
+    <div v-if="loading" class="flex justify-center items-center h-96">
+      <el-skeleton :rows="10" animated class="w-full" />
+    </div>
+
+    <div v-else-if="session" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- Left Column: Code Editors (2/3) -->
+      <div class="col-span-2 code-section pr-3 space-y-6">
+        <!-- 题目描述 -->
+        <div class="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden">
+          <div
+            class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-500 to-cyan-600 text-white"
+          >
+            <div class="flex items-center gap-3 font-medium text-lg">
+              <el-icon size="18"><TicketsIcon /></el-icon>
+              <span>Problem Description</span>
+            </div>
+          </div>
+          <div class="p-4">
+            <!-- 关键修复：使用 v-model 和 safeDescription 计算属性 -->
+            <el-input
+              type="textarea"
+              v-model="safeDescription"
+              :rows="3"
+              placeholder="Describe the problem requirements and constraints..."
+              class="!border-none !shadow-none"
+              @input="markUnsaved()"
+            />
+          </div>
+        </div>
+
+        <!-- 数据生成器 (带AI按钮和语言选择) -->
+        <div class="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden">
+          <div
+            class="flex items-center justify-between p-4 bg-gradient-to-r from-purple-600 to-indigo-700 text-white"
+          >
+            <div class="flex items-center gap-3 font-medium text-lg">
+              <el-icon size="18"><DataAnalysisIcon /></el-icon>
+              <span>Generator (C++/testlib)</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2">
+                <span class="text-sm hidden md:inline">Language:</span>
+                <el-select v-model="genLanguage" size="small" class="!w-24">
+                  <el-option
+                    v-for="lang in languageOptions"
+                    :key="lang.value"
+                    :label="lang.label"
+                    :value="lang.value"
+                  />
+                </el-select>
+                <el-select v-model="genVersion" size="small" class="!w-24">
+                  <el-option
+                    v-for="version in languageOptions.find((l) => l.value === genLanguage)
+                      ?.versions || []"
+                    :key="version"
+                    :label="version.toUpperCase()"
+                    :value="version"
+                  />
+                </el-select>
+              </div>
+              <el-button
+                size="small"
+                @click="generateCode('generator')"
+                class="!h-8 !px-3 !text-sm !bg-white/20 hover:!bg-white/30 font-medium flex items-center gap-1"
+                style="--el-button-text-color: white; --el-button-hover-text-color: white"
+              >
+                <el-icon size="16" class="text-white"><MagicStickIcon /></el-icon>
+                <span class="hidden md:inline">AI Generate</span>
+              </el-button>
+            </div>
+          </div>
+          <div class="h-[320px]">
+            <MonacoEditor
+              v-if="session.gen_code"
+              :value="session.gen_code.content || ''"
+              @editorDidMount="onGenEditorMounted"
+              @input="handleGenCodeInput"
+              :language="genLanguage === 'c' ? 'c' : 'cpp'"
+              theme="vs-dark"
+              :options="{
+                fontSize: 14,
+                lineNumbers: 'on',
+                minimap: { enabled: false },
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                padding: { top: 16, bottom: 16 },
+                rulers: [80],
+                tabSize: 2,
+                insertSpaces: true,
+              }"
+              class="h-full"
+            />
+            <!-- 添加加载状态 -->
+            <div v-else class="h-full flex items-center justify-center">
+              <el-skeleton :rows="10" animated />
+            </div>
+          </div>
+        </div>
+
+        <!-- 标准代码 (带AI按钮和语言选择) -->
+        <div class="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden">
+          <div
+            class="flex items-center justify-between p-4 bg-gradient-to-r from-green-600 to-emerald-700 text-white"
+          >
+            <div class="flex items-center gap-3 font-medium text-lg">
+              <el-icon size="18"><SuccessFilledIcon /></el-icon>
+              <span>Standard Code</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2">
+                <span class="text-sm hidden md:inline">Language:</span>
+                <el-select v-model="stdLanguage" size="small" class="!w-24">
+                  <el-option
+                    v-for="lang in languageOptions"
+                    :key="lang.value"
+                    :label="lang.label"
+                    :value="lang.value"
+                  />
+                </el-select>
+                <el-select v-model="stdVersion" size="small" class="!w-24">
+                  <el-option
+                    v-for="version in languageOptions.find((l) => l.value === stdLanguage)
+                      ?.versions || []"
+                    :key="version"
+                    :label="version.toUpperCase()"
+                    :value="version"
+                  />
+                </el-select>
+              </div>
+              <el-button
+                size="small"
+                @click="generateCode('standard')"
+                class="!h-8 !px-3 !text-sm !bg-white/20 hover:!bg-white/30 font-medium text-white flex items-center gap-1"
+                style="--el-button-text-color: white; --el-button-hover-text-color: white"
+              >
+                <el-icon size="16" class="text-white"><MagicStickIcon /></el-icon>
+                <span class="hidden md:inline">AI Generate</span>
+              </el-button>
+            </div>
+          </div>
+          <div class="h-[320px]">
+            <MonacoEditor
+              v-if="session.std_code"
+              :value="session.std_code.content || ''"
+              @editorDidMount="onStdEditorMounted"
+              @input="handleStdCodeInput"
+              :language="stdLanguage === 'c' ? 'c' : 'cpp'"
+              theme="vs-dark"
+              :options="{
+                fontSize: 14,
+                lineNumbers: 'on',
+                minimap: { enabled: false },
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                padding: { top: 16, bottom: 16 },
+                rulers: [80],
+                tabSize: 2,
+                insertSpaces: true,
+              }"
+              class="h-full"
+            />
+            <div v-else class="h-full flex items-center justify-center">
+              <el-skeleton :rows="10" animated />
+            </div>
+          </div>
+        </div>
+
+        <!-- 用户代码 (带语言选择) -->
+        <div class="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden">
+          <div
+            class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-600 to-cyan-700 text-white"
+          >
+            <div class="flex items-center gap-3 font-medium text-lg">
+              <el-icon size="18"><UserIcon /></el-icon>
+              <span>User Code</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm hidden md:inline">Language:</span>
+              <el-select v-model="userLanguage" size="small" class="!w-24">
+                <el-option
+                  v-for="lang in languageOptions"
+                  :key="lang.value"
+                  :label="lang.label"
+                  :value="lang.value"
+                />
+              </el-select>
+              <el-select v-model="userVersion" size="small" class="!w-24">
+                <el-option
+                  v-for="version in languageOptions.find((l) => l.value === userLanguage)
+                    ?.versions || []"
+                  :key="version"
+                  :label="version.toUpperCase()"
+                  :value="version"
+                />
+              </el-select>
+            </div>
+          </div>
+          <div class="h-[320px]">
+            <MonacoEditor
+              v-if="session.user_code"
+              :value="session.user_code.content || ''"
+              @editorDidMount="onUserEditorMounted"
+              @input="handleUserCodeInput"
+              :language="userLanguage === 'c' ? 'c' : 'cpp'"
+              theme="vs-dark"
+              :options="{
+                fontSize: 14,
+                lineNumbers: 'on',
+                minimap: { enabled: false },
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                padding: { top: 16, bottom: 16 },
+                rulers: [80],
+                tabSize: 2,
+                insertSpaces: true,
+              }"
+              class="h-full"
+            />
+            <div v-else class="h-full flex items-center justify-center">
+              <el-skeleton :rows="10" animated />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Test Cases (1/3) -->
+      <div class="history-section flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-3">
+            <el-icon class="text-blue-500 text-2xl"><DocumentCheckedIcon /></el-icon>
+            <span>History Test Cases ({{ session.test_cases?.length || 0 }})</span>
+          </h2>
+        </div>
+
+        <!-- 失败信息 -->
+        <div
+          v-if="diffFailed"
+          class="flex flex-col items-center justify-center bg-red-50 rounded-xl border-2 border-dashed border-red-200 p-6"
+        >
+          <el-icon class="text-red-500 text-5xl mb-4"><WarningIcon /></el-icon>
+          <h3 class="text-xl font-bold text-red-700 mb-2">Continuous Diff Failed</h3>
+          <p class="text-gray-700 mb-4 text-center">{{ failureMessage }}</p>
+          <div
+            v-if="failureDetail"
+            class="w-full bg-white rounded-lg border border-red-200 p-4 max-h-64 overflow-y-auto font-mono text-sm"
+          >
+            <p class="text-red-600 whitespace-pre-wrap">{{ failureDetail }}</p>
+          </div>
+          <el-button type="danger" size="medium" @click="resetDiffState" class="mt-6 px-6 py-2">
+            <el-icon class="mr-1"><RefreshIcon /></el-icon>
+            Try Again
+          </el-button>
+        </div>
+
+        <!-- 测试用例容器 - 独立滚动区域 -->
+        <div v-else class="test-cases-container">
+          <div v-if="loading && !isGenerating" class="flex justify-center items-center h-64">
+            <el-skeleton :rows="6" animated class="w-full" />
+          </div>
+
+          <div
+            v-else-if="!session.test_cases || session.test_cases.length === 0"
+            class="flex flex-col items-center justify-center h-64 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300"
+          >
+            <el-icon class="text-gray-400 text-4xl mb-4"><FolderOpenedIcon /></el-icon>
+            <p class="text-lg text-gray-600 mb-2">
+              {{ isGenerating ? 'Generating test cases...' : 'No test cases yet' }}
+            </p>
+            <div v-if="isGenerating" class="mt-4">
+              <el-skeleton :rows="3" animated class="w-full max-w-md" />
+            </div>
+            <el-button
+              v-if="!isGenerating"
+              type="primary"
+              size="medium"
+              @click="startContinuousGeneration"
+              class="mt-2 px-4 py-2"
+            >
+              <el-icon class="mr-1"><RefreshIcon /></el-icon>
+              Generate First Test
+            </el-button>
+          </div>
+
+          <transition-group name="list" tag="div" class="space-y-3" v-else>
+            <TestcaseCard
+              v-for="(testcase, index) in session.test_cases"
+              :key="`${testcase.id}-${index}`"
+              :testcase="testcase"
+              :is-expanded="false"
+            />
+          </transition-group>
+        </div>
+
+        <!-- 固定的操作按钮区域 -->
+        <div class="action-buttons">
+          <div class="mb-4">
+            <div class="flex justify-between text-sm mb-1 font-medium">
+              <span>Current status: {{ currentStatus }}</span>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-3">
+            <el-button
+              v-if="!isGenerating"
+              type="primary"
+              size="large"
+              @click="startContinuousGeneration"
+              :disabled="loading"
+              class="flex-1 px-4 py-3 text-base font-medium shadow-md hover:shadow-lg transition-all"
+            >
+              <el-icon class="mr-1 text-lg"><RefreshIcon /></el-icon>
+              <span>Continuous Diff</span>
+            </el-button>
+
+            <el-button
+              v-if="isGenerating"
+              type="danger"
+              size="large"
+              @click="stopContinuousGeneration"
+              class="flex-1 px-4 py-3 text-base font-medium shadow-md hover:shadow-lg transition-all"
+            >
+              <el-icon class="mr-1 text-lg"><CloseIcon /></el-icon>
+              <span>Stop Diff</span>
+            </el-button>
+
+            <el-button
+              type="warning"
+              size="large"
+              @click="testExistingData"
+              :disabled="loading || !session.test_cases || session.test_cases.length === 0"
+              class="flex-1 px-4 py-3 text-base font-medium shadow-md hover:shadow-lg transition-all"
+            >
+              <el-icon class="mr-1 text-lg"><VideoPlayIcon /></el-icon>
+              <span>Rerun Tests</span>
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="flex flex-col items-center justify-center h-96">
+      <el-icon class="text-yellow-500 text-6xl mb-6"><WarningIcon /></el-icon>
+      <p class="text-2xl text-gray-700 font-bold mb-4">Session not found</p>
+      <el-button type="primary" size="large" @click="router.push('/')" class="px-8 py-4 text-lg">
+        <el-icon class="mr-2"><HouseIcon /></el-icon>
+        Go to Home
+      </el-button>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+/* 容器最大宽度和内边距 */
+.container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* 滚动区域样式 */
+.code-section {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  padding-right: 15px;
+}
+.history-section {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 200px); /* 与左侧栏相同的高度限制 */
+  overflow: hidden; /* 防止内部溢出 */
+}
+
+/* 移除按钮背景 */
+.action-buttons {
+  padding: 20px 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 确保下拉框内容完整显示 */
+:deep(.el-select__wrapper) {
+  overflow: visible !important;
+}
+
+:deep(.el-select-dropdown__item) {
+  white-space: nowrap !important;
+  overflow: visible !important;
+}
+
+/* 滚动条样式 */
+.test-cases-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 8px;
+  margin-bottom: 16px;
+  /* 精细滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f3f5;
+}
+
+.test-cases-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.test-cases-container::-webkit-scrollbar-track {
+  background: #f1f3f5;
+  border-radius: 4px;
+}
+
+.test-cases-container::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+.test-cases-container::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* 操作按钮固定底部 */
+.action-buttons {
+  flex-shrink: 0; /* 确保按钮区域不收缩 */
+  padding: 16px 0;
+  background: white;
+  border-top: 1px solid #e2e8f0;
+  margin-top: auto; /* 推到容器底部 */
+}
+
+/* 响应式调整 */
+@media (max-width: 1024px) {
+  .history-section {
+    max-height: calc(100vh - 250px);
+  }
+
+  .action-buttons {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+  }
+}
+
+/* 状态显示样式 */
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.status-success {
+  background-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+}
+
+.status-error {
+  background-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
+}
+
+.status-warning {
+  background-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
+}
+
+.status-info {
+  background-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* 失败消息样式 */
+.failure-container {
+  border-radius: 16px !important;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border: 2px solid #fecaca;
+}
+
+.failure-title {
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  color: #b91c1c !important;
+}
+
+.failure-message {
+  font-size: 1.1rem !important;
+  color: #454545 !important;
+}
+
+.failure-detail {
+  font-size: 0.9rem !important;
+  line-height: 1.6 !important;
+  max-height: 20rem !important;
+}
+</style>
