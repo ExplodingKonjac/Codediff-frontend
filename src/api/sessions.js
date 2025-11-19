@@ -40,31 +40,6 @@ export const createSession = (sessionData) => {
 }
 
 export const updateSession = (id, updates) => {
-  // // 关键修复：确保所有内容都是字符串
-  // const payload = {
-  //   title: String(updates.title),
-  //   description: String(updates.description),
-  //   user_code: {
-  //     lang: String(updates.user_code.lang),
-  //     std: String(updates.user_code.std),
-  //     content: String(updates.user_code.content || '')
-  //   },
-  //   std_code: {
-  //     lang: String(updates.std_code.lang),
-  //     std: String(updates.std_code.std),
-  //     content: String(updates.std_code.content || '')
-  //   }
-  // }
-  
-  // // 可选字段
-  // if (updates.gen_code && updates.gen_code.content) {
-  //   payload.gen_code = {
-  //     lang: String(updates.gen_code.lang),
-  //     std: String(updates.gen_code.std),
-  //     content: String(updates.gen_code.content)
-  //   }
-  // }
-  
   return api.put(`/sessions/${id}`, updates)
 }
 

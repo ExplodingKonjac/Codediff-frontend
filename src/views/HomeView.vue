@@ -6,23 +6,87 @@ import { getSessions, createSession } from '@/api/sessions'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import SessionCard from '@/components/SessionCard.vue'
 // 正确导入图标
-import { Plus as PlusIcon } from '@element-plus/icons-vue'
+import {
+  Plus as PlusIcon,
+  RefreshRight as RefreshRightIcon,
+  Sort as SortIcon,
+  DocumentRemove as DocumentRemoveIcon,
+} from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const sessions = ref([])
 const loading = ref(true)
 
+// ===== 新增：分页和排序状态 =====
+const pagination = ref({
+  page: 1,
+  per_page: 10,
+  total: 0,
+  pages: 0,
+})
+
+const sortOptions = [
+  { label: 'Update time', value: 'updated_at' },
+  { label: 'Create time', value: 'created_at' },
+  { label: 'Title', value: 'title' },
+]
+
+const sortOrderOptions = [
+  { label: 'Descending', value: 'desc' },
+  { label: 'Ascending', value: 'asc' },
+]
+
+const sortConfig = ref({
+  sort: 'updated_at',
+  order: 'desc',
+})
+
+// ===== 新增：获取分页会话列表 =====
 const fetchSessions = async () => {
   try {
     loading.value = true
-    const response = await getSessions()
+
+    const response = await getSessions({
+      page: pagination.value.page,
+      per_page: pagination.value.per_page,
+      sort: sortConfig.value.sort,
+      order: sortConfig.value.order,
+    })
+
     sessions.value = response.data.sessions || []
+    pagination.value = {
+      page: response.data.page,
+      per_page: response.data.per_page,
+      total: response.data.total,
+      pages: response.data.pages,
+    }
+
+    console.log('Pagination:', pagination.value)
   } catch (error) {
+    console.error('Failed to load sessions:', error)
     ElMessage.error(`Failed to load sessions: ${error.message}`)
   } finally {
     loading.value = false
   }
+}
+
+// ===== 新增：分页变更处理 =====
+const handlePageChange = (page) => {
+  pagination.value.page = page
+  fetchSessions()
+}
+
+const handlePageSizeChange = (size) => {
+  pagination.value.per_page = size
+  pagination.value.page = 1 // 重置到第一页
+  fetchSessions()
+}
+
+// ===== 新增：排序变更处理 =====
+const handleSortChange = () => {
+  pagination.value.page = 1 // 排序变化时重置到第一页
+  fetchSessions()
 }
 
 const createNewSession = async () => {
@@ -145,35 +209,75 @@ const handleSessionDeleted = ({ id }) => {
 onMounted(() => {
   if (authStore.isAuthenticated) {
     fetchSessions()
-    // 修复：移除 window 事件监听
-    // window.addEventListener('session-deleted', handleSessionDeleted)
-    // window.addEventListener('title-updated', handleTitleUpdated)
   } else {
     router.push('/login')
   }
-})
-
-onUnmounted(() => {
-  // 修复：移除 window 事件监听
-  // window.removeEventListener('session-deleted', handleSessionDeleted)
-  // window.removeEventListener('title-updated', handleTitleUpdated)
 })
 </script>
 
 <template>
   <div class="container mx-auto px-4 py-8 max-w-6xl">
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
-      <h1 class="text-3xl font-bold text-gray-800 mb-4 sm:mb-0">My Diff Sessions</h1>
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+      <h1 class="text-3xl font-bold text-gray-800">My Diff Sessions</h1>
 
-      <el-button
-        type="primary"
-        @click="createNewSession"
-        :loading="loading"
-        class="flex items-center gap-2 px-6 py-3 font-medium text-lg shadow-md hover:shadow-lg transition-shadow"
-      >
-        <el-icon class="text-xl"><PlusIcon /></el-icon>
-        <span>New Session</span>
-      </el-button>
+      <!-- ===== 重构：统一控制栏 ===== -->
+      <div class="flex flex-col sm:flex-row gap-3 sm:items-center w-full sm:w-auto">
+        <!-- ===== 重构：排序控件容器 ===== -->
+        <div class="h-10 flex items-center bg-white border border-gray-300 rounded-lg px-3">
+          <el-space size="1em">
+            <el-icon class="text-blue-500"><SortIcon /></el-icon>
+            <span class="text-gray-700 font-medium mr-2 whitespace-nowrap">Sort By:</span>
+            <el-select
+              v-model="sortConfig.sort"
+              @change="handleSortChange"
+              class="!h-7 min-w-[120px] !border-0 !shadow-none"
+              size="small"
+            >
+              <el-option
+                v-for="option in sortOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+
+            <el-select
+              v-model="sortConfig.order"
+              @change="handleSortChange"
+              class="!h-7 min-w-[120px] !border-0 !shadow-none"
+              size="small"
+            >
+              <el-option
+                v-for="option in sortOrderOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+          </el-space>
+        </div>
+
+        <!-- 按钮区域 -->
+        <el-button
+          type="primary"
+          @click="createNewSession"
+          class="flex items-center gap-2 h-10 px-4 font-medium shadow-md hover:shadow-lg transition-shadow"
+        >
+          <el-icon class="text-xl"><PlusIcon /></el-icon>
+          <span>New Session</span>
+        </el-button>
+
+        <el-button
+          type="default"
+          @click="fetchSessions"
+          :loading="loading"
+          class="flex items-center gap-2 h-10 px-4"
+          style="margin-left: 0"
+        >
+          <el-icon class="text-lg"><RefreshRightIcon /></el-icon>
+          <span>Refresh</span>
+        </el-button>
+      </div>
     </div>
 
     <div v-if="loading" class="space-y-6">
@@ -202,6 +306,32 @@ onUnmounted(() => {
         @session-deleted="handleSessionDeleted"
       />
     </div>
+
+    <!-- ===== 新增：分页控件 ===== -->
+    <div
+      v-if="!loading && sessions.length > 0"
+      class="mt-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+    >
+      <div class="text-gray-600">
+        Showing
+        <span class="font-medium">{{ (pagination.page - 1) * pagination.per_page + 1 }}</span> to
+        <span class="font-medium">{{
+          Math.min(pagination.page * pagination.per_page, pagination.total)
+        }}</span>
+        of <span class="font-medium">{{ pagination.total }}</span> results
+      </div>
+
+      <el-pagination
+        :current-page="pagination.page"
+        :page-sizes="[5, 10, 20, 50]"
+        :page-size="pagination.per_page"
+        :total="pagination.total"
+        layout="total, sizes, prev, pager, next, jumper"
+        @current-change="handlePageChange"
+        @size-change="handlePageSizeChange"
+        class="pagination-control"
+      />
+    </div>
   </div>
 </template>
 
@@ -212,11 +342,27 @@ onUnmounted(() => {
   padding: 0 2rem;
 }
 
-/* 确保卡片容器有白色背景 */
-.card-container {
-  background-color: white;
-  border-radius: 1.25rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e2e8f0;
+/* 分页控件样式 */
+:deep(.pagination-control .el-pagination) {
+  justify-content: flex-end;
+}
+
+:deep(.pagination-control .el-pagination .el-pagination__total) {
+  margin-right: 1rem;
+}
+
+:deep(.pagination-control .el-pagination .el-pagination__jump) {
+  margin-left: 0.5rem;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .pagination-control {
+    justify-content: center !important;
+  }
+
+  :deep(.pagination-control .el-pagination__sizes) {
+    display: none;
+  }
 }
 </style>

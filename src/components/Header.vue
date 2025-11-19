@@ -110,14 +110,6 @@ const handleNewSession = () => {
                 <span>Profile</span>
               </div>
 
-              <div
-                class="flex items-center gap-3 px-4 py-2 hover:bg-blue-50 cursor-pointer"
-                @click="handleNewSession"
-              >
-                <el-icon class="text-blue-500 text-lg"><PlusIcon /></el-icon>
-                <span>New Session</span>
-              </div>
-
               <div class="border-t border-gray-100 my-1"></div>
 
               <div

@@ -225,7 +225,7 @@ const onUserEditorMounted = (editor) => {
   userEditor.value = editor
 }
 
-const handleGenCodeInput = (value) => {
+const handleGenCodeChanged = (value) => {
   if (session.value?.gen_code) {
     // const content = getEditorContent(value)
     // session.value.gen_code.content = content
@@ -234,7 +234,7 @@ const handleGenCodeInput = (value) => {
   }
 }
 
-const handleStdCodeInput = (value) => {
+const handleStdCodeChanged = (value) => {
   if (session.value?.std_code) {
     // const content = getEditorContent(value)
     // session.value.std_code.content = content
@@ -243,7 +243,7 @@ const handleStdCodeInput = (value) => {
   }
 }
 
-const handleUserCodeInput = (value) => {
+const handleUserCodeChanged = (value) => {
   if (session.value?.user_code) {
     // const content = getEditorContent(value)
     // session.value.user_code.content = content
@@ -1010,7 +1010,7 @@ onUnmounted(() => {
               v-if="session.gen_code"
               :value="session.gen_code.content || ''"
               @editorDidMount="onGenEditorMounted"
-              @input="handleGenCodeInput"
+              @change="handleGenCodeChanged"
               :language="genLanguage === 'c' ? 'c' : 'cpp'"
               theme="vs-dark"
               :options="{
@@ -1079,7 +1079,7 @@ onUnmounted(() => {
               v-if="session.std_code"
               :value="session.std_code.content || ''"
               @editorDidMount="onStdEditorMounted"
-              @input="handleStdCodeInput"
+              @change="handleStdCodeChanged"
               :language="stdLanguage === 'c' ? 'c' : 'cpp'"
               theme="vs-dark"
               :options="{
@@ -1136,7 +1136,7 @@ onUnmounted(() => {
               v-if="session.user_code"
               :value="session.user_code.content || ''"
               @editorDidMount="onUserEditorMounted"
-              @input="handleUserCodeInput"
+              @change="handleUserCodeChanged"
               :language="userLanguage === 'c' ? 'c' : 'cpp'"
               theme="vs-dark"
               :options="{

@@ -146,8 +146,8 @@ const handleDelete = async (event) => {
       </p>
 
       <div class="flex flex-wrap gap-2 mb-5">
-        <el-tag v-if="session.test_case_count" type="info" size="small" class="font-medium">
-          {{ session.test_case_count }} test{{ session.test_case_count > 1 ? 's' : '' }}
+        <el-tag type="info" size="small" class="font-medium">
+          {{ session.test_case_count || 0 }} test{{ session.test_case_count > 1 ? 's' : '' }}
         </el-tag>
       </div>
 
