@@ -199,9 +199,7 @@ const handleContentClick = (event) => {
                 <div>
                   <span class="text-sm text-gray-500">Memory:</span>
                   <span class="ml-2 font-medium">{{
-                    testcase.memory_used != null
-                      ? (testcase.memory_used / 1024.0 / 1024.0).toFixed(2) + 'MB'
-                      : 'N/A'
+                    testcase.memory_used != null ? testcase.memory_used.toFixed(2) + 'MB' : 'N/A'
                   }}</span>
                 </div>
               </div>
