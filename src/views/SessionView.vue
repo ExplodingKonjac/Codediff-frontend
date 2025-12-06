@@ -27,6 +27,7 @@ import {
   DataAnalysis as DataAnalysisIcon,
   Tickets as TicketsIcon,
   Edit as EditIcon,
+  Loading as LoadingIcon,
 } from '@element-plus/icons-vue'
 
 MonacoEditor.render = () => h('div')
@@ -43,6 +44,10 @@ const lastErrorIndex = ref(-1)
 const hasUnsavedChanges = ref(false)
 let sseClient = null
 let saveTimeout = null
+let aiSSEClient = {
+  generator: null,
+  standard: null,
+}
 
 const authStore = useAuthStore()
 
@@ -148,17 +153,24 @@ const userVersion = computed({
 
 const currentStatus = ref('Ready')
 
-const statusColor = computed(() => {
-  if (currentStatus.value.includes('error') || currentStatus.value.includes('failed')) {
-    return 'text-red-500 bg-red-50'
-  }
-  if (currentStatus.value.includes('success') || currentStatus.value.includes('completed')) {
-    return 'text-green-500 bg-green-50'
-  }
-  if (currentStatus.value.includes('pending') || currentStatus.value.includes('starting')) {
-    return 'text-blue-500 bg-blue-50'
-  }
-  return 'text-yellow-500 bg-yellow-50'
+// ===== 新增：AI 按钮 loading 状态 =====
+const aiLoading = ref({
+  generator: false,
+  standard: false,
+})
+
+// 新增 AI 按钮 loading 状态和流式内容
+const aiStreaming = ref({
+  generator: {
+    loading: false,
+    content: '',
+    complete: false,
+  },
+  standard: {
+    loading: false,
+    content: '',
+    complete: false,
+  },
 })
 
 // 关键修复：确保计算属性正确工作
@@ -364,79 +376,6 @@ const resetDiffState = () => {
   }
 }
 
-// 新增 SSE 事件处理函数
-const handleSSEStatus = (data) => {
-  currentStatus.value = data.status || 'Unknown status'
-  console.log('Current status:', currentStatus.value)
-}
-
-const handleSSEError = (data) => {
-  currentStatus.value = `Error: ${data.message || 'Unknown error'}`
-  lastError.value = true
-  ElMessage.error(`SSE Error: ${data.message || 'Unknown error'}`)
-}
-
-const handleSSETestResult = async (data) => {
-  console.log('Test result received:', data)
-
-  if (!data.test_case) {
-    console.error('Missing test_case in SSE data:', data)
-    return
-  }
-
-  // 确保 test_cases 存在且是响应式的
-  ensureTestCases()
-
-  try {
-    // 创建新测试用例的响应式副本
-    console.log(data)
-    const newTestCase = {
-      id: data.test_case.id || Date.now(),
-      status: data.test_case.status || 'PENDING',
-      input: data.test_case.input || '',
-      output: data.test_case.output || '',
-      answer: data.test_case.answer || '',
-      time_used: data.test_case.time_used || 0,
-      memory_used: data.test_case.memory_used || 0,
-      created_at: data.test_case.created_at || new Date().toISOString(),
-    }
-
-    // 使用 Vue.set 确保响应性
-    session.value.test_cases.push(newTestCase)
-    generatedCount.value = data.test_num || generatedCount.value + 1
-
-    console.log('Test cases count:', session.value.test_cases.length)
-
-    // 滚动到底部
-    await nextTick()
-    scrollToBottom()
-  } catch (error) {
-    console.error('Error processing test result:', error)
-    ElMessage.warning('Failed to process test result')
-  }
-}
-
-const handleSSEFinish = () => {
-  currentStatus.value = 'Continuous diff finished'
-  ElMessage.success('Continuous diff finished successfully!')
-  stopContinuousGeneration()
-}
-
-const handleSSEFailed = (data) => {
-  console.error('Diff failed:', data)
-
-  diffFailed.value = true
-  currentStatus.value = 'Continuous diff failed'
-  failureMessage.value = data.message || 'Unknown error occurred'
-  failureDetail.value = data.detail || ''
-
-  // 停止生成
-  stopContinuousGeneration()
-
-  // 显示错误消息
-  ElMessage.error(`Continuous diff failed: ${failureMessage.value}`)
-}
-
 // 滚动到底部
 const scrollToBottom = () => {
   nextTick(() => {
@@ -503,31 +442,25 @@ const startContinuousGeneration = async () => {
     }
 
     // 使用 EventSourcePolyfill
-    const sseUrl = `${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/start`
+    let sseUrl = new URL(`${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/start`)
+    sseUrl.searchParams.append('max_tests', 100)
+    sseUrl.searchParams.append('stop_on_fail', 'true')
 
-    const body = JSON.stringify({
-      max_tests: 100,
-      stop_on_fail: true,
-    })
-
-    sseClient = new EventSourcePolyfill(sseUrl, {
+    sseClient = new EventSourcePolyfill(sseUrl.toString(), {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       heartbeatTimeout: 30000,
       connectionTimeout: 10000,
-      fetchOptions: {
-        method: 'POST',
-        body: body,
-      },
     })
 
     // 事件监听
     sseClient.addEventListener('status', (event) => {
       try {
         const data = JSON.parse(event.data)
-        handleSSEStatus(data)
+        currentStatus.value = data.status || 'Unknown status'
+        console.log('Current status:', currentStatus.value)
       } catch (e) {
         console.error('Error parsing status event:', e)
       }
@@ -536,33 +469,84 @@ const startContinuousGeneration = async () => {
     sseClient.addEventListener('failed', (event) => {
       try {
         const data = JSON.parse(event.data)
-        handleSSEFailed(data)
+        console.error('Diff failed:', data)
+
+        diffFailed.value = true
+        currentStatus.value = 'Continuous diff failed'
+        failureMessage.value = data.message || 'Unknown error occurred'
+        failureDetail.value = data.detail || ''
+
+        // 停止生成
+        stopContinuousGeneration()
+
+        // 显示错误消息
+        ElMessage.error(`Continuous diff failed: ${failureMessage.value}`)
       } catch (e) {
         console.error('Error parsing failed event:', e)
-        handleSSEFailed({ message: 'Failed to parse error message', detail: event.data })
       }
     })
 
     sseClient.addEventListener('error', (event) => {
       try {
         const data = JSON.parse(event.data)
-        handleSSEError(data)
+        currentStatus.value = `Error: ${data.message || 'Unknown error'}`
+        lastError.value = true
+        ElMessage.error(`SSE Error: ${data.message || 'Unknown error'}`)
       } catch (e) {
         console.error('Error parsing error event:', e)
       }
     })
 
-    sseClient.addEventListener('test_result', (event) => {
+    sseClient.addEventListener('test_result', async (event) => {
       try {
         const data = JSON.parse(event.data)
-        handleSSETestResult(data)
+
+        console.log('Test result received:', data)
+
+        if (!data.test_case) {
+          console.error('Missing test_case in SSE data:', data)
+          return
+        }
+
+        // 确保 test_cases 存在且是响应式的
+        ensureTestCases()
+
+        try {
+          // 创建新测试用例的响应式副本
+          console.log(data)
+          const newTestCase = {
+            id: data.test_case.id || Date.now(),
+            status: data.test_case.status || 'PENDING',
+            input: data.test_case.input || '',
+            output: data.test_case.output || '',
+            answer: data.test_case.answer || '',
+            time_used: data.test_case.time_used || 0,
+            memory_used: data.test_case.memory_used || 0,
+            created_at: data.test_case.created_at || new Date().toISOString(),
+          }
+
+          // 使用 Vue.set 确保响应性
+          session.value.test_cases.push(newTestCase)
+          generatedCount.value = data.test_num || generatedCount.value + 1
+
+          console.log('Test cases count:', session.value.test_cases.length)
+
+          // 滚动到底部
+          await nextTick()
+          scrollToBottom()
+        } catch (error) {
+          console.error('Error processing test result:', error)
+          ElMessage.warning('Failed to process test result')
+        }
       } catch (e) {
         console.error('Error parsing test_result event:', e)
       }
     })
 
     sseClient.addEventListener('finish', () => {
-      handleSSEFinish()
+      currentStatus.value = 'Continuous diff finished'
+      ElMessage.success('Continuous diff finished successfully!')
+      stopContinuousGeneration()
     })
 
     // 连接错误
@@ -666,11 +650,6 @@ const testExistingData = async () => {
     // 使用 EventSourcePolyfill
     const sseUrl = `${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/rerun`
 
-    const body = JSON.stringify({
-      max_tests: 100,
-      stop_on_fail: true,
-    })
-
     sseClient = new EventSourcePolyfill(sseUrl, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -678,10 +657,6 @@ const testExistingData = async () => {
       },
       heartbeatTimeout: 30000,
       connectionTimeout: 10000,
-      fetchOptions: {
-        method: 'POST',
-        body: body,
-      },
     })
 
     // 事件监听
@@ -788,77 +763,163 @@ const deleteSessionConfirm = () => {
     })
 }
 
-const generateCode = async (type) => {
+// ===== 新增：流式 AI 生成代码 =====
+const generateCodeStreaming = async (type) => {
   if (!session.value || !sessionId.value) {
     ElMessage.warning('Session not loaded')
     return
   }
 
+  // 重置之前的状态
+  aiStreaming.value[type] = {
+    loading: true,
+    content: '',
+    complete: false,
+  }
+
   try {
-    loading.value = true
-    ElMessage.info(`Generating ${type} code with AI...`)
-
-    // 调用后端 API 生成代码
-    const response = await apiGenerateCode(type, sessionId.value)
-    if (!response.data || !response.data.generated_code) {
-      throw new Error('Invalid response from AI service')
+    // 获取 token
+    const token = authStore.token
+    if (!token) {
+      throw new Error('Authentication required. Please login again.')
     }
 
-    const generated = response.data
+    // 构建 SSE URL
+    let sseUrl = new URL(`${import.meta.env.VITE_API_URL}/ai/stream-generate`)
+    sseUrl.searchParams.set('type', type)
+    sseUrl.searchParams.set('session_id', sessionId.value)
 
-    // 根据类型更新不同的代码区域
-    if (type === 'generator') {
-      if (!session.value.gen_code) {
-        session.value.gen_code = {
-          lang: generated.lang || 'cpp',
-          std: generated.std || 'c++17',
-          content: generated.generated_code,
+    // 创建 SSE 连接
+    aiSSEClient[type] = new EventSourcePolyfill(sseUrl.toString(), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      heartbeatTimeout: 30000,
+      connectionTimeout: 10000,
+    })
+
+    // 处理代码片段
+    aiSSEClient[type].addEventListener('code_chunk', (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        console.log('Received code chunk:', data)
+
+        // 更新流式内容
+        aiStreaming.value[type].content += data.content
+
+        // 更新编辑器内容
+        if (type === 'generator' && genEditor.value) {
+          toRaw(genEditor.value).setValue(aiStreaming.value.generator.content)
+        } else if (type === 'standard' && stdEditor.value) {
+          toRaw(stdEditor.value).setValue(aiStreaming.value.standard.content)
         }
-      } else {
-        session.value.gen_code.content = generated.generated_code
-        session.value.gen_code.lang = generated.lang || 'cpp'
-        session.value.gen_code.std = generated.std || 'c++17'
+      } catch (e) {
+        console.error('Error parsing code chunk event:', e)
       }
+    })
 
-      // 如果有编辑器实例，更新内容
-      if (genEditor.value) {
-        toRaw(genEditor.value).setValue(generated.generated_code)
-      }
-    } else if (type === 'standard') {
-      if (!session.value.std_code) {
-        session.value.std_code = {
-          lang: generated.lang || 'cpp',
-          std: generated.std || 'c++17',
-          content: generated.generated_code,
+    // 处理完成事件
+    aiSSEClient[type].addEventListener('finish', (event) => {
+      try {
+        ElMessage.success(
+          `${type === 'generator' ? 'Generator' : 'Standard'} code generated successfully!`,
+        )
+
+        // 更新 session 数据
+        if (type === 'generator') {
+          if (!session.value.gen_code) {
+            session.value.gen_code = {
+              lang: 'cpp',
+              std: 'c++17',
+              content: aiStreaming.value.generator.content,
+            }
+          } else {
+            session.value.gen_code.content = aiStreaming.value.generator.content
+            session.value.gen_code.lang = 'cpp'
+            session.value.gen_code.std = 'c++17'
+          }
+        } else if (type === 'standard') {
+          if (!session.value.std_code) {
+            session.value.std_code = {
+              lang: 'cpp',
+              std: 'c++17',
+              content: aiStreaming.value.standard.content,
+            }
+          } else {
+            session.value.std_code.content = aiStreaming.value.standard.content
+            session.value.std_code.lang = 'cpp'
+            session.value.std_code.std = 'c++17'
+          }
         }
-      } else {
-        session.value.std_code.content = generated.generated_code
-        session.value.std_code.lang = generated.lang || 'cpp'
-        session.value.std_code.std = generated.std || 'c++17'
-      }
 
-      if (stdEditor.value) {
-        toRaw(stdEditor.value).setValue(generated.generated_code)
+        // 标记为未保存
+        markUnsaved()
+        stopAIGeneration(type)
+      } catch (e) {
+        console.error('Error handling finish event:', e)
       }
+    })
+
+    // 处理错误
+    aiSSEClient[type].addEventListener('error', (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        console.error('AI generation error:', data)
+        ElMessage.error(`AI generation failed: ${data.message || 'Unknown error'}`)
+      } catch (e) {
+        console.error('Error parsing error event:', e)
+        ElMessage.error('AI generation failed')
+      } finally {
+        stopAIGeneration(type)
+      }
+    })
+
+    // 连接错误
+    aiSSEClient[type].onerror = (error) => {
+      console.error('AI SSE connection error:', error)
+      ElMessage.error('AI connection failed')
+      stopAIGeneration(type)
     }
-
-    // 标记为未保存
-    markUnsaved()
-
-    ElMessage.success(
-      `${type === 'generator' ? 'Generator' : 'Standard'} code generated successfully!`,
-    )
   } catch (error) {
-    console.error(`AI generation failed:`, error)
-    let errorMessage = 'AI generation failed'
-    if (error.response?.data?.message) {
-      errorMessage = error.response.data.message
-    } else if (error.message) {
-      errorMessage = error.message
-    }
-    ElMessage.error(errorMessage)
-  } finally {
-    loading.value = false
+    console.error('Failed to start AI generation:', error)
+    ElMessage.error(`Failed to start AI generation: ${error.message || 'Unknown error'}`)
+    stopAIGeneration(type)
+  }
+}
+
+// ===== 修改：停止 AI 生成 =====
+const stopAIGeneration = (type) => {
+  if (aiSSEClient[type]) {
+    aiSSEClient[type].close()
+    aiSSEClient[type] = null
+    aiStreaming.value[type].loading = false
+    aiStreaming.value[type].complete = true
+  }
+}
+
+// ===== 修改：清理 AI 状态 =====
+const cleanupAIState = () => {
+  if (aiSSEClient.generator) {
+    aiSSEClient.generator.close()
+    aiSSEClient.generator = null
+  }
+  if (aiSSEClient.standard) {
+    aiSSEClient.standard.close()
+    aiSSEClient.standard = null
+  }
+
+  aiStreaming.value = {
+    generator: {
+      loading: false,
+      content: '',
+      complete: false,
+    },
+    standard: {
+      loading: false,
+      content: '',
+      complete: false,
+    },
   }
 }
 
@@ -880,6 +941,7 @@ onUnmounted(() => {
   if (sseClient) {
     sseClient.close()
   }
+  cleanupAIState() // 清理 AI 状态
   if (saveTimeout) clearTimeout(saveTimeout)
   window.removeEventListener('beforeunload', () => {})
   diffFailed.value = false
@@ -994,15 +1056,28 @@ onUnmounted(() => {
                   />
                 </el-select>
               </div>
-              <el-button
-                size="small"
-                @click="generateCode('generator')"
-                class="!h-8 !px-3 !text-sm !bg-white/20 hover:!bg-white/30 font-medium flex items-center gap-1"
-                style="--el-button-text-color: white; --el-button-hover-text-color: white"
-              >
-                <el-icon size="16" class="text-white"><MagicStickIcon /></el-icon>
-                <span class="hidden md:inline">AI Generate</span>
-              </el-button>
+              <div class="flex items-center">
+                <el-button
+                  v-if="!aiStreaming.generator.loading"
+                  size="small"
+                  @click="generateCodeStreaming('generator')"
+                  class="!h-8 !px-3 !text-sm !bg-white/20 hover:!bg-white/30 font-medium flex items-center gap-1"
+                  style="--el-button-text-color: white; --el-button-hover-text-color: white"
+                >
+                  <el-icon size="16" class="text-white"><MagicStickIcon /></el-icon>
+                  <span class="hidden md:inline">AI Generate</span>
+                </el-button>
+                <el-button
+                  v-else
+                  size="small"
+                  @click="stopAIGeneration('generator')"
+                  class="!h-8 !px-3 !text-sm !bg-red-500/20 hover:!bg-red-500/30 font-medium text-white flex items-center gap-1"
+                  style="--el-button-text-color: white; --el-button-hover-text-color: white"
+                >
+                  <el-icon size="16" class="text-white animate-spin"><LoadingIcon /></el-icon>
+                  <span class="hidden md:inline">Generating...</span>
+                </el-button>
+              </div>
             </div>
           </div>
           <div class="h-[320px]">
@@ -1063,15 +1138,28 @@ onUnmounted(() => {
                   />
                 </el-select>
               </div>
-              <el-button
-                size="small"
-                @click="generateCode('standard')"
-                class="!h-8 !px-3 !text-sm !bg-white/20 hover:!bg-white/30 font-medium text-white flex items-center gap-1"
-                style="--el-button-text-color: white; --el-button-hover-text-color: white"
-              >
-                <el-icon size="16" class="text-white"><MagicStickIcon /></el-icon>
-                <span class="hidden md:inline">AI Generate</span>
-              </el-button>
+              <div class="flex items-center">
+                <el-button
+                  v-if="!aiStreaming.standard.loading"
+                  size="small"
+                  @click="generateCodeStreaming('standard')"
+                  class="!h-8 !px-3 !text-sm !bg-white/20 hover:!bg-white/30 font-medium text-white flex items-center gap-1"
+                  style="--el-button-text-color: white; --el-button-hover-text-color: white"
+                >
+                  <el-icon size="16" class="text-white"><MagicStickIcon /></el-icon>
+                  <span class="hidden md:inline">AI Generate</span>
+                </el-button>
+                <el-button
+                  v-else
+                  size="small"
+                  @click="stopAIGeneration('standard')"
+                  class="!h-8 !px-3 !text-sm !bg-red-500/20 hover:!bg-red-500/30 font-medium text-white flex items-center gap-1"
+                  style="--el-button-text-color: white; --el-button-hover-text-color: white"
+                >
+                  <el-icon size="16" class="text-white animate-spin"><LoadingIcon /></el-icon>
+                  <span class="hidden md:inline">Generating...</span>
+                </el-button>
+              </div>
             </div>
           </div>
           <div class="h-[320px]">
@@ -1428,5 +1516,25 @@ onUnmounted(() => {
   font-size: 0.9rem !important;
   line-height: 1.6 !important;
   max-height: 20rem !important;
+}
+
+/* 按钮加载动画 */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 按钮禁用状态 */
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 </style>

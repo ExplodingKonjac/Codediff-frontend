@@ -45,6 +45,14 @@ const statusConfig = computed(() => {
       icon: CloseBoldIcon,
       label: 'Wrong Answer',
     },
+    RE: {
+      color: 'text-red-600',
+      bgColor: 'bg-red-50',
+      borderColor: 'border-red-200',
+      thinBorderColor: 'border-green-100',
+      icon: CloseBoldIcon,
+      label: 'Runtime Error',
+    },
     TLE_or_MLE: {
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-50',
@@ -227,7 +235,7 @@ const handleContentClick = (event) => {
               <span class="font-medium text-gray-700">User Output</span>
             </div>
             <div
-              class="p-3 max-h-48 overflow-y-auto font-mono text-sm whitespace-pre-wra"
+              class="p-3 max-h-48 overflow-y-auto font-mono text-sm whitespace-pre-wrap"
               :class="`${statusConfig.bgColor} ${statusConfig.color}`"
             >
               <div v-if="testcase.output">{{ testcase.output }}</div>
