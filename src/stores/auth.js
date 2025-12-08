@@ -1,8 +1,7 @@
 import { defineStore } from 'pinia'
 import { authApi } from '@/api/request'
+import router from '@/router/index'
 import { ElMessage } from 'element-plus'
-import { useRouter } from 'vue-router'
-import { useRoute } from 'vue-router'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -125,14 +124,11 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       
-      // 重定向到登录页
-      const router = useRouter()
-      const route = useRoute()
-      
-      if (route.path !== '/login') {
+      // 重定向到登录页    
+      // if (route.path !== '/login') {
         ElMessage.info('You have been logged out')
         router.push('/login')
-      }
+      // }
     }
   }
 })

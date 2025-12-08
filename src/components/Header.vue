@@ -33,8 +33,8 @@ const handleLogout = async () => {
       authStore.logout()
       router.push('/login')
     })
-    .catch(() => {
-      ElMessage.info('Logout canceled')
+    .catch((reason) => {
+      ElMessage.info(`Logout canceled: ${reason}`)
     })
 }
 
