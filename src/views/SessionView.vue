@@ -642,7 +642,7 @@ const startContinuousGeneration = async () => {
   generatedCount.value = 0
 
   try {
-    let sseUrl = URL(`${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/start`)
+    let sseUrl = new URL(`${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/start`)
     sseUrl.searchParams.set('max_tests', maxTests.value)
     if (selectedChecker.value) {
       sseUrl.searchParams.set('checker', selectedChecker.value)
@@ -707,7 +707,7 @@ const testExistingData = async () => {
   generatedCount.value = 0
 
   try {
-    let sseUrl = URL(`${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/rerun`)
+    let sseUrl = new URL(`${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/rerun`)
     if (selectedChecker.value) {
       sseUrl.searchParams.set('checker', selectedChecker.value)
     }
