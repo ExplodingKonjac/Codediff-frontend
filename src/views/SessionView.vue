@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, h, toRaw, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, h, toRaw, nextTick, triggerRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { EventSourcePolyfill } from 'event-source-polyfill'
 import { useAuthStore } from '@/stores/auth'
@@ -39,8 +39,6 @@ const session = ref(null)
 const loading = ref(true)
 const isGenerating = ref(false)
 const generatedCount = ref(0)
-const lastError = ref(false)
-const lastErrorIndex = ref(-1)
 const hasUnsavedChanges = ref(false)
 let sseClient = null
 let saveTimeout = null
@@ -59,6 +57,103 @@ const userEditor = ref(null)
 const diffFailed = ref(false)
 const failureMessage = ref('')
 const failureDetail = ref('')
+
+const maxTests = ref(100)
+const selectedChecker = ref('wcmp')
+
+// Checker 选项配置
+const checkerOptions = [
+  {
+    value: 'caseicmp',
+    label: 'caseicmp',
+    description: 'Single int64 checker with testcase-support',
+  },
+  {
+    value: 'casencmp',
+    label: 'casencmp',
+    description: 'Many int64s checker with testcase-support',
+  },
+  {
+    value: 'casewcmp',
+    label: 'casewcmp',
+    description: 'Tokens checker with testcase-support',
+  },
+  {
+    value: 'dcmp',
+    label: 'dcmp',
+    description: 'compare two doubles, maximal absolute or relative error = 1e-6',
+  },
+  {
+    value: 'fcmp',
+    label: 'fcmp',
+    description: 'compare files as sequence of lines',
+  },
+  {
+    value: 'hcmp',
+    label: 'hcmp',
+    description: 'compare two signed huge integers',
+  },
+  {
+    value: 'icmp',
+    label: 'icmp',
+    description: 'compare two signed ints',
+  },
+  {
+    value: 'lcmp',
+    label: 'lcmp',
+    description: 'compare files as sequence of tokens in lines',
+  },
+  {
+    value: 'ncmp',
+    label: 'ncmp',
+    description: 'compare ordered sequences of long longs',
+  },
+  {
+    value: 'nyesno',
+    label: 'nyesno',
+    description: 'multiple YES / NO (case insensitive)',
+  },
+  {
+    value: 'rcmp',
+    label: 'rcmp',
+    description: 'compare two doubles, maximal absolute error = 1.5e-6',
+  },
+  {
+    value: 'rcmp4',
+    label: 'rcmp4',
+    description: 'compare two sequences of doubles, max absolute or relative error = 1e-4',
+  },
+  {
+    value: 'rcmp6',
+    label: 'rcmp6',
+    description: 'compare two sequences of doubles, max absolute or relative error = 1e-6',
+  },
+  {
+    value: 'rcmp9',
+    label: 'rcmp9',
+    description: 'compare two sequences of doubles, max absolute or relative error = 1e-9',
+  },
+  {
+    value: 'rncmp',
+    label: 'rncmp',
+    description: 'compare two sequences of doubles, maximal absolute error = 1.5e-5',
+  },
+  {
+    value: 'uncmp',
+    label: 'uncmp',
+    description: 'compare unordered sequences of long longs',
+  },
+  {
+    value: 'wcmp',
+    label: 'wcmp',
+    description: 'compare sequences of tokens',
+  },
+  {
+    value: 'yesno',
+    label: 'yesno',
+    description: 'YES / NO (case insensitive)',
+  },
+]
 
 // 语言选项
 const languageOptions = [
@@ -153,12 +248,6 @@ const userVersion = computed({
 
 const currentStatus = ref('Ready')
 
-// ===== 新增：AI 按钮 loading 状态 =====
-const aiLoading = ref({
-  generator: false,
-  standard: false,
-})
-
 // 新增 AI 按钮 loading 状态和流式内容
 const aiStreaming = ref({
   generator: {
@@ -239,27 +328,18 @@ const onUserEditorMounted = (editor) => {
 
 const handleGenCodeChanged = (value) => {
   if (session.value?.gen_code) {
-    // const content = getEditorContent(value)
-    // session.value.gen_code.content = content
-    // markFieldDirty('gen_code')
     markUnsaved()
   }
 }
 
 const handleStdCodeChanged = (value) => {
   if (session.value?.std_code) {
-    // const content = getEditorContent(value)
-    // session.value.std_code.content = content
-    // markFieldDirty('std_code')
     markUnsaved()
   }
 }
 
 const handleUserCodeChanged = (value) => {
   if (session.value?.user_code) {
-    // const content = getEditorContent(value)
-    // session.value.user_code.content = content
-    // markFieldDirty('user_code')
     markUnsaved()
   }
 }
@@ -345,6 +425,10 @@ const fetchSession = async () => {
 
     if (!sessionData.test_cases) {
       sessionData.test_cases = []
+    } else {
+      for (var i = 0; i < sessionData.test_cases.length; i++) {
+        sessionData.test_cases[i].id = i + 1
+      }
     }
 
     session.value = sessionData
@@ -389,15 +473,146 @@ const scrollToBottom = () => {
   })
 }
 
-// 重新获取会话数据
-const refreshSessionData = async () => {
-  try {
-    const response = await getSessionById(sessionId.value)
-    session.value = response.data
-  } catch (error) {
-    console.error('Failed to refresh session data:', error)
-    ElMessage.error('Failed to refresh session data')
+const getDiffSSEClient = (sseUrl) => {
+  // 获取 token
+  const token = authStore.token
+  if (!token) {
+    throw new Error('Authentication required. Please login again.')
   }
+
+  sseClient = new EventSourcePolyfill(sseUrl.toString(), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    heartbeatTimeout: 30000,
+    connectionTimeout: 10000,
+  })
+
+  // 事件监听
+  sseClient.addEventListener('status', (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      currentStatus.value = data.status || 'Unknown status'
+      console.log('Current status:', currentStatus.value)
+    } catch (e) {
+      console.error('Error parsing status event:', e)
+    }
+  })
+
+  sseClient.addEventListener('failed', (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      console.error('Diff failed:', data)
+
+      diffFailed.value = true
+      currentStatus.value = 'Diff failed'
+      failureMessage.value = data.message || 'Unknown error occurred'
+      failureDetail.value = data.detail || ''
+
+      // 停止生成
+      stopContinuousGeneration()
+
+      // 显示错误消息
+      ElMessage.error(`Diff failed: ${failureMessage.value}`)
+    } catch (e) {
+      console.error('Error parsing failed event:', e)
+    }
+  })
+
+  sseClient.addEventListener('error', (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      currentStatus.value = `Error: ${data.message || 'Unknown error'}`
+      ElMessage.error(`SSE Error: ${data.message || 'Unknown error'}`)
+    } catch (e) {
+      console.error('Error parsing error event:', e)
+    }
+  })
+
+  sseClient.addEventListener('test_result', async (event) => {
+    try {
+      const data = JSON.parse(event.data)
+
+      console.log('Test result received:', data)
+
+      if (!data.test_case) {
+        console.error('Missing test_case in SSE data:', data)
+        return
+      }
+
+      try {
+        // 创建新测试用例的响应式副本
+        console.log(data)
+        const newTestCase = {
+          id: session.value.test_cases.length + 1,
+          status: data.test_case.status || 'PENDING',
+          input: data.test_case.input || '',
+          output: data.test_case.output || '',
+          answer: data.test_case.answer || '',
+          detail: data.test_case.detail || '',
+          time_used: data.test_case.time_used || 0,
+          memory_used: data.test_case.memory_used || 0,
+          created_at: data.test_case.created_at || new Date().toISOString(),
+        }
+
+        // 使用 Vue.set 确保响应性
+        session.value.test_cases.push(newTestCase)
+        generatedCount.value = generatedCount.value + 1
+        triggerRef(generatedCount)
+
+        console.log('Test cases count:', generatedCount.value)
+
+        // 滚动到底部
+        await nextTick()
+        scrollToBottom()
+      } catch (error) {
+        console.error('Error processing test result:', error)
+        ElMessage.warning('Failed to process test result')
+      }
+    } catch (e) {
+      console.error('Error parsing test_result event:', e)
+    }
+  })
+
+  sseClient.addEventListener('finish', () => {
+    currentStatus.value = 'Diff finished'
+    ElMessage.success('Diff finished successfully!')
+    stopContinuousGeneration()
+  })
+
+  // 连接错误
+  sseClient.onerror = (error) => {
+    console.error('SSE connection error:', error)
+
+    let errorMessage = 'SSE Connection error'
+
+    if (
+      error?.status === 401 ||
+      error?.message?.includes('401') ||
+      error?.message?.includes('Unauthorized')
+    ) {
+      errorMessage = 'Authentication failed. Please login again.'
+      authStore.logout()
+      router.push('/login')
+    } else if (error?.status === 403) {
+      errorMessage = "You don't have permission to access this session."
+    } else if (error?.status >= 500) {
+      errorMessage = 'Server error. Please try again later.'
+    }
+
+    currentStatus.value = `Error: ${errorMessage}`
+    ElMessage.error(errorMessage)
+    stopContinuousGeneration()
+  }
+
+  // 连接成功
+  sseClient.onopen = () => {
+    console.log('SSE connection established with custom headers')
+    currentStatus.value = 'Connection established. Starting tests...'
+  }
+
+  return sseClient
 }
 
 const startContinuousGeneration = async () => {
@@ -422,163 +637,23 @@ const startContinuousGeneration = async () => {
     }
   }
 
-  // 清除旧的测试用例
   session.value.test_cases = []
-  // 强制 Vue 重新追踪
   session.value = { ...session.value }
+  diffFailed.value = false
 
-  session.value.test_cases = []
   currentStatus.value = 'Starting continuous diff...'
   isGenerating.value = true
   generatedCount.value = 0
-  lastError.value = false
-  lastErrorIndex.value = -1
 
   try {
-    // 获取 token
-    const token = authStore.token
-    if (!token) {
-      throw new Error('Authentication required. Please login again.')
-    }
-
-    // 使用 EventSourcePolyfill
     let sseUrl = new URL(`${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/start`)
-    sseUrl.searchParams.append('max_tests', 100)
+    sseUrl.searchParams.append('max_tests', maxTests.value) // 添加参数
     sseUrl.searchParams.append('stop_on_fail', 'true')
-
-    sseClient = new EventSourcePolyfill(sseUrl.toString(), {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      heartbeatTimeout: 30000,
-      connectionTimeout: 10000,
-    })
-
-    // 事件监听
-    sseClient.addEventListener('status', (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        currentStatus.value = data.status || 'Unknown status'
-        console.log('Current status:', currentStatus.value)
-      } catch (e) {
-        console.error('Error parsing status event:', e)
-      }
-    })
-
-    sseClient.addEventListener('failed', (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        console.error('Diff failed:', data)
-
-        diffFailed.value = true
-        currentStatus.value = 'Continuous diff failed'
-        failureMessage.value = data.message || 'Unknown error occurred'
-        failureDetail.value = data.detail || ''
-
-        // 停止生成
-        stopContinuousGeneration()
-
-        // 显示错误消息
-        ElMessage.error(`Continuous diff failed: ${failureMessage.value}`)
-      } catch (e) {
-        console.error('Error parsing failed event:', e)
-      }
-    })
-
-    sseClient.addEventListener('error', (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        currentStatus.value = `Error: ${data.message || 'Unknown error'}`
-        lastError.value = true
-        ElMessage.error(`SSE Error: ${data.message || 'Unknown error'}`)
-      } catch (e) {
-        console.error('Error parsing error event:', e)
-      }
-    })
-
-    sseClient.addEventListener('test_result', async (event) => {
-      try {
-        const data = JSON.parse(event.data)
-
-        console.log('Test result received:', data)
-
-        if (!data.test_case) {
-          console.error('Missing test_case in SSE data:', data)
-          return
-        }
-
-        // 确保 test_cases 存在且是响应式的
-        ensureTestCases()
-
-        try {
-          // 创建新测试用例的响应式副本
-          console.log(data)
-          const newTestCase = {
-            id: data.test_case.id || Date.now(),
-            status: data.test_case.status || 'PENDING',
-            input: data.test_case.input || '',
-            output: data.test_case.output || '',
-            answer: data.test_case.answer || '',
-            time_used: data.test_case.time_used || 0,
-            memory_used: data.test_case.memory_used || 0,
-            created_at: data.test_case.created_at || new Date().toISOString(),
-          }
-
-          // 使用 Vue.set 确保响应性
-          session.value.test_cases.push(newTestCase)
-          generatedCount.value = data.test_num || generatedCount.value + 1
-
-          console.log('Test cases count:', session.value.test_cases.length)
-
-          // 滚动到底部
-          await nextTick()
-          scrollToBottom()
-        } catch (error) {
-          console.error('Error processing test result:', error)
-          ElMessage.warning('Failed to process test result')
-        }
-      } catch (e) {
-        console.error('Error parsing test_result event:', e)
-      }
-    })
-
-    sseClient.addEventListener('finish', () => {
-      currentStatus.value = 'Continuous diff finished'
-      ElMessage.success('Continuous diff finished successfully!')
-      stopContinuousGeneration()
-    })
-
-    // 连接错误
-    sseClient.onerror = (error) => {
-      console.error('SSE connection error:', error)
-
-      let errorMessage = 'Connection error during continuous diff'
-
-      if (
-        error?.status === 401 ||
-        error?.message?.includes('401') ||
-        error?.message?.includes('Unauthorized')
-      ) {
-        errorMessage = 'Authentication failed. Please login again.'
-        authStore.logout()
-        router.push('/login')
-      } else if (error?.status === 403) {
-        errorMessage = "You don't have permission to access this session."
-      } else if (error?.status >= 500) {
-        errorMessage = 'Server error. Please try again later.'
-      }
-
-      currentStatus.value = `Error: ${errorMessage}`
-      ElMessage.error(errorMessage)
-      stopContinuousGeneration()
+    if (selectedChecker.value) {
+      sseUrl.searchParams.append('checker', selectedChecker.value) // 添加 checker 参数
     }
 
-    // 连接成功
-    sseClient.onopen = () => {
-      console.log('SSE connection established with custom headers')
-      currentStatus.value = 'Connection established. Starting tests...'
-    }
+    sseClient = getDiffSSEClient(sseUrl)
   } catch (error) {
     console.error('Failed to start continuous diff:', error)
     currentStatus.value = `Error: ${error.message || 'Unknown error'}`
@@ -628,109 +703,21 @@ const testExistingData = async () => {
     }
   }
 
-  // 清除旧的测试用例
   session.value.test_cases = []
-  // 强制 Vue 重新追踪
   session.value = { ...session.value }
+  diffFailed.value = false
 
-  session.value.test_cases = []
   currentStatus.value = 'Rerunning existing testcases...'
   isGenerating.value = true
   generatedCount.value = 0
-  lastError.value = false
-  lastErrorIndex.value = -1
 
   try {
-    // 获取 token
-    const token = authStore.token
-    if (!token) {
-      throw new Error('Authentication required. Please login again.')
+    let sseUrl = new URL(`${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/rerun`)
+    if (selectedChecker.value) {
+      sseUrl.searchParams.append('checker', selectedChecker.value) // 添加 checker 参数
     }
 
-    // 使用 EventSourcePolyfill
-    const sseUrl = `${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/rerun`
-
-    sseClient = new EventSourcePolyfill(sseUrl, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      heartbeatTimeout: 30000,
-      connectionTimeout: 10000,
-    })
-
-    // 事件监听
-    sseClient.addEventListener('status', (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        handleSSEStatus(data)
-      } catch (e) {
-        console.error('Error parsing status event:', e)
-      }
-    })
-
-    sseClient.addEventListener('failed', (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        handleSSEError(data)
-      } catch (e) {
-        console.error('Error parsing error event:', e)
-      }
-    })
-
-    sseClient.addEventListener('failed', (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        handleSSEFailed(data)
-      } catch (e) {
-        console.error('Error parsing failed event:', e)
-        handleSSEFailed({ message: 'Failed to parse error message', detail: event.data })
-      }
-    })
-
-    sseClient.addEventListener('test_result', (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        handleSSETestResult(data)
-      } catch (e) {
-        console.error('Error parsing test_result event:', e)
-      }
-    })
-
-    sseClient.addEventListener('finish', () => {
-      handleSSEFinish()
-    })
-
-    // 连接错误
-    sseClient.onerror = (error) => {
-      console.error('SSE connection error:', error)
-
-      let errorMessage = 'Connection error during rerunning'
-
-      if (
-        error?.status === 401 ||
-        error?.message?.includes('401') ||
-        error?.message?.includes('Unauthorized')
-      ) {
-        errorMessage = 'Authentication failed. Please login again.'
-        authStore.logout()
-        router.push('/login')
-      } else if (error?.status === 403) {
-        errorMessage = "You don't have permission to access this session."
-      } else if (error?.status >= 500) {
-        errorMessage = 'Server error. Please try again later.'
-      }
-
-      currentStatus.value = `Error: ${errorMessage}`
-      ElMessage.error(errorMessage)
-      stopContinuousGeneration()
-    }
-
-    // 连接成功
-    sseClient.onopen = () => {
-      console.log('SSE connection established with custom headers')
-      currentStatus.value = 'Connection established. Starting tests...'
-    }
+    sseClient = getDiffSSEClient(sseUrl)
   } catch (error) {
     console.error('Failed to rerun existing testcases:', error)
     currentStatus.value = `Error: ${error.message || 'Unknown error'}`
@@ -1262,7 +1249,7 @@ onUnmounted(() => {
           class="flex flex-col items-center justify-center bg-red-50 rounded-xl border-2 border-dashed border-red-200 p-6"
         >
           <el-icon class="text-red-500 text-5xl mb-4"><WarningIcon /></el-icon>
-          <h3 class="text-xl font-bold text-red-700 mb-2">Continuous Diff Failed</h3>
+          <h3 class="text-xl font-bold text-red-700 mb-2">Diff Failed</h3>
           <p class="text-gray-700 mb-4 text-center">{{ failureMessage }}</p>
           <div
             v-if="failureDetail"
@@ -1320,6 +1307,54 @@ onUnmounted(() => {
           <div class="mb-4">
             <div class="flex justify-between text-sm mb-1 font-medium">
               <span>Current status: {{ currentStatus }}</span>
+            </div>
+          </div>
+
+          <!-- ===== 修正：max_tests 和 checker 控制器 ===== -->
+          <div class="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <!-- 垂直布局容器 -->
+            <div class="flex flex-col gap-3">
+              <!-- Max Tests 行 -->
+              <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                <label class="text-sm font-medium text-gray-700 min-w-[80px]">Max Tests</label>
+                <el-input-number
+                  v-model="maxTests"
+                  :min="1"
+                  :max="1000"
+                  placeholder="Max tests to generate"
+                  class="w-full sm:w-auto flex-1"
+                />
+                <p class="text-xs text-gray-500 sm:text-right">Tests to generate (1-1000)</p>
+              </div>
+
+              <!-- Checker 选择器 -->
+              <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                <label class="text-sm font-medium text-gray-700 min-w-[80px]">Checker</label>
+                <div class="w-full sm:w-auto flex-1">
+                  <el-select
+                    v-model="selectedChecker"
+                    placeholder="Select checker"
+                    class="w-full"
+                    :filterable="true"
+                  >
+                    <el-option
+                      v-for="checker in checkerOptions"
+                      :key="checker.value"
+                      :label="checker.label"
+                      :value="checker.value"
+                    >
+                      <el-popover trigger="hover" :content="checker.description" placement="right">
+                        <template #reference>
+                          <div class="flex justify-between items-center">
+                            {{ checker.label }}
+                          </div>
+                        </template>
+                      </el-popover>
+                    </el-option>
+                  </el-select>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Checker to judge outputs</p>
+              </div>
             </div>
           </div>
 
@@ -1536,5 +1571,71 @@ onUnmounted(() => {
 button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+/* 选择器样式优化 */
+:deep(.el-select .el-input__wrapper) {
+  border-radius: 6px !important;
+}
+
+:deep(.el-input-number .el-input__wrapper) {
+  border-radius: 6px !important;
+}
+
+/* 控制器区域样式 */
+.controller-group {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+/* 优化选项样式 */
+:deep(.el-select-dropdown__item) {
+  padding: 12px 16px !important;
+  line-height: 1.5 !important;
+}
+
+/* 优化 popover 样式 */
+:deep(.el-popover) {
+  max-width: 300px;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+/* 确保下拉菜单在顶部显示 */
+:deep(.el-select-dropdown) {
+  z-index: 9999 !important;
+}
+
+/* 选项悬浮效果 */
+:deep(.el-select-dropdown__item:hover) {
+  background-color: #f3f4f6 !important;
+}
+
+/* 响应式调整 */
+@media (max-width: 640px) {
+  .controller-group {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .action-buttons {
+    position: sticky !important;
+    bottom: 0 !important;
+    background: white !important;
+    padding: 16px !important;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  /* 在小屏幕上，让输入框占据全宽 */
+  .controller-group > div {
+    width: 100% !important;
+  }
+
+  .controller-group .el-input-number,
+  .controller-group .el-select {
+    width: 100% !important;
+  }
 }
 </style>
