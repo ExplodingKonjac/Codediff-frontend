@@ -6,13 +6,15 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import monacoEditorPlugin from 'vite-plugin-monaco-editor'
 import tailwindcss from '@tailwindcss/vite'
+import commonjs from 'vite-plugin-commonjs';
 
 export default defineConfig({
   plugins: [
     vue(),
     VueDevtools(),
     tailwindcss(),
-    monacoEditorPlugin.default({})
+    monacoEditorPlugin.default({}),
+    commonjs(),
   ],
   resolve: {
     alias: {
@@ -26,7 +28,10 @@ export default defineConfig({
           monaco: ['monaco-editor']
         }
       }
-    }
+    },
+	  commonjsOptions: {
+	    transformMixedEsModules: true
+	  }
   },
   optimizeDeps: {
     include: [

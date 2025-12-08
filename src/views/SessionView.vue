@@ -348,8 +348,6 @@ const saveSession = async () => {
   if (!hasUnsavedChanges.value || !session.value) return
 
   try {
-    loading.value = true
-
     // 从编辑器获取当前内容
     session.value.gen_code.content = toRaw(genEditor.value).getValue()
     session.value.std_code.content = toRaw(stdEditor.value).getValue()
@@ -382,8 +380,6 @@ const saveSession = async () => {
   } catch (error) {
     console.error('Save error:', error)
     ElMessage.error(`Failed to save session: ${error.message || 'Unknown error'}`)
-  } finally {
-    loading.value = false
   }
 }
 
@@ -646,11 +642,10 @@ const startContinuousGeneration = async () => {
   generatedCount.value = 0
 
   try {
-    let sseUrl = new URL(`${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/start`)
-    sseUrl.searchParams.append('max_tests', maxTests.value) // 添加参数
-    sseUrl.searchParams.append('stop_on_fail', 'true')
+    let sseUrl = URL(`${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/start`)
+    sseUrl.searchParams.set('max_tests', maxTests.value)
     if (selectedChecker.value) {
-      sseUrl.searchParams.append('checker', selectedChecker.value) // 添加 checker 参数
+      sseUrl.searchParams.set('checker', selectedChecker.value)
     }
 
     sseClient = getDiffSSEClient(sseUrl)
@@ -712,9 +707,9 @@ const testExistingData = async () => {
   generatedCount.value = 0
 
   try {
-    let sseUrl = new URL(`${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/rerun`)
+    let sseUrl = URL(`${import.meta.env.VITE_API_URL}/diff/${sessionId.value}/rerun`)
     if (selectedChecker.value) {
-      sseUrl.searchParams.append('checker', selectedChecker.value) // 添加 checker 参数
+      sseUrl.searchParams.set('checker', selectedChecker.value)
     }
 
     sseClient = getDiffSSEClient(sseUrl)
