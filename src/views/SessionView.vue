@@ -1,11 +1,11 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed, h, toRaw, nextTick, triggerRef } from 'vue'
+import { ref, onMounted, onUnmounted, computed, h, toRaw, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { EventSourcePolyfill } from 'event-source-polyfill'
 import { useAuthStore } from '@/stores/auth'
 import { getSessionById, updateSession, deleteSession } from '@/api/sessions'
 import { stopContinuousDiff as apiStopContinuousDiff } from '@/api/diff'
-import { generateCode as apiGenerateCode } from '@/api/ai'
+import { ocr as apiOcr } from '@/api/ai'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import MonacoEditor from 'vue-monaco'
 import TestcaseCard from '@/components/TestcaseCard.vue'
@@ -28,6 +28,7 @@ import {
   Tickets as TicketsIcon,
   Edit as EditIcon,
   Loading as LoadingIcon,
+  Upload as UploadIcon,
 } from '@element-plus/icons-vue'
 
 MonacoEditor.render = () => h('div')
@@ -49,10 +50,11 @@ let aiSSEClient = {
 
 const authStore = useAuthStore()
 
-// 新增编辑器引用
-const genEditor = ref(null)
-const stdEditor = ref(null)
-const userEditor = ref(null)
+const editors = ref({
+  generator: null,
+  standard: null,
+  user: null,
+})
 
 const diffFailed = ref(false)
 const failureMessage = ref('')
@@ -60,6 +62,12 @@ const failureDetail = ref('')
 
 const maxTests = ref(100)
 const selectedChecker = ref('wcmp')
+
+// 新增 OCR 相关状态
+const ocrUploading = ref(false)
+const ocrDialogVisible = ref(false)
+const ocrImageFile = ref(null)
+const ocrImageUrl = ref('')
 
 // Checker 选项配置
 const checkerOptions = [
@@ -315,15 +323,15 @@ const editSessionTitle = () => {
 }
 
 const onGenEditorMounted = (editor) => {
-  genEditor.value = editor
+  editors.value.generator = editor
 }
 
 const onStdEditorMounted = (editor) => {
-  stdEditor.value = editor
+  editors.value.standard = editor
 }
 
 const onUserEditorMounted = (editor) => {
-  userEditor.value = editor
+  editors.value.user = editor
 }
 
 const handleGenCodeChanged = (value) => {
@@ -349,9 +357,9 @@ const saveSession = async () => {
 
   try {
     // 从编辑器获取当前内容
-    session.value.gen_code.content = toRaw(genEditor.value).getValue()
-    session.value.std_code.content = toRaw(stdEditor.value).getValue()
-    session.value.user_code.content = toRaw(userEditor.value).getValue()
+    session.value.gen_code.content = toRaw(editors.value.generator).getValue()
+    session.value.std_code.content = toRaw(editors.value.standard).getValue()
+    session.value.user_code.content = toRaw(editors.value.user).getValue()
 
     // 构建更新数据
     const updateData = {
@@ -436,15 +444,6 @@ const fetchSession = async () => {
   }
 }
 
-// 关键修复：确保 test_cases 是响应式数组
-const ensureTestCases = () => {
-  if (!session.value.test_cases) {
-    session.value.test_cases = []
-  }
-  // 强制 Vue 重新追踪响应性
-  session.value = { ...session.value, test_cases: [...session.value.test_cases] }
-}
-
 const resetDiffState = () => {
   diffFailed.value = false
   failureMessage.value = ''
@@ -456,7 +455,6 @@ const resetDiffState = () => {
   }
 }
 
-// 滚动到底部
 const scrollToBottom = () => {
   nextTick(() => {
     const container = document.querySelector('.test-cases-container')
@@ -555,7 +553,6 @@ const getDiffSSEClient = (sseUrl) => {
         // 使用 Vue.set 确保响应性
         session.value.test_cases.push(newTestCase)
         generatedCount.value = generatedCount.value + 1
-        triggerRef(generatedCount)
 
         console.log('Test cases count:', generatedCount.value)
 
@@ -699,7 +696,6 @@ const testExistingData = async () => {
   }
 
   session.value.test_cases = []
-  session.value = { ...session.value }
   diffFailed.value = false
 
   currentStatus.value = 'Rerunning existing testcases...'
@@ -745,7 +741,6 @@ const deleteSessionConfirm = () => {
     })
 }
 
-// ===== 新增：流式 AI 生成代码 =====
 const generateCodeStreaming = async (type) => {
   if (!session.value || !sessionId.value) {
     ElMessage.warning('Session not loaded')
@@ -791,11 +786,7 @@ const generateCodeStreaming = async (type) => {
         aiStreaming.value[type].content += data.content
 
         // 更新编辑器内容
-        if (type === 'generator' && genEditor.value) {
-          toRaw(genEditor.value).setValue(aiStreaming.value.generator.content)
-        } else if (type === 'standard' && stdEditor.value) {
-          toRaw(stdEditor.value).setValue(aiStreaming.value.standard.content)
-        }
+        toRaw(editors.value[type]).setValue(aiStreaming.value[type].content)
       } catch (e) {
         console.error('Error parsing code chunk event:', e)
       }
@@ -870,7 +861,6 @@ const generateCodeStreaming = async (type) => {
   }
 }
 
-// ===== 修改：停止 AI 生成 =====
 const stopAIGeneration = (type) => {
   if (aiSSEClient[type]) {
     aiSSEClient[type].close()
@@ -880,7 +870,6 @@ const stopAIGeneration = (type) => {
   }
 }
 
-// ===== 修改：清理 AI 状态 =====
 const cleanupAIState = () => {
   if (aiSSEClient.generator) {
     aiSSEClient.generator.close()
@@ -904,6 +893,83 @@ const cleanupAIState = () => {
     },
   }
 }
+
+// ===== 新增：OCR 相关方法 =====
+const handleOCRUpload = () => {
+  ocrDialogVisible.value = true
+  ocrImageFile.value = null
+  ocrImageUrl.value = ''
+}
+
+const handleOCRFileChange = (file) => {
+  ocrImageFile.value = file.raw
+  ocrImageUrl.value = URL.createObjectURL(file.raw)
+}
+
+const handleOCRPaste = (event) => {
+  const items = event.clipboardData.items
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') !== -1) {
+      const blob = items[i].getAsFile()
+      ocrImageFile.value = blob
+      ocrImageUrl.value = URL.createObjectURL(blob)
+      break
+    }
+  }
+}
+
+const performOCR = async () => {
+  if (!ocrImageFile.value) {
+    ElMessage.warning('Please select an image file')
+    return
+  }
+
+  try {
+    ocrUploading.value = true
+    ocrDialogVisible.value = false
+
+    const response = await apiOcr(ocrImageFile.value)
+
+    if (response.data && response.data.text) {
+      // 将识别的文本追加到题目描述
+      if (session.value.description) {
+        session.value.description += '\n\n' + response.data.text
+      } else {
+        session.value.description = response.data.text
+      }
+
+      ElMessage.success('OCR completed successfully')
+      markUnsaved()
+    } else {
+      throw new Error('Invalid OCR response')
+    }
+  } catch (error) {
+    console.error('OCR failed:', error)
+    ElMessage.error(`OCR failed: ${error.message || 'Unknown error'}`)
+  } finally {
+    ocrUploading.value = false
+  }
+}
+
+const resetOCRState = () => {
+  ocrDialogVisible.value = false
+  ocrImageFile.value = null
+  if (ocrImageUrl.value) {
+    URL.revokeObjectURL(ocrImageUrl.value)
+    ocrImageUrl.value = ''
+  }
+}
+
+// 监听对话框关闭状态
+watch(ocrDialogVisible, (val) => {
+  if (val) {
+    // 添加粘贴事件监听器
+    document.addEventListener('paste', handleOCRPaste)
+  } else {
+    // 移除粘贴事件监听器
+    document.removeEventListener('paste', handleOCRPaste)
+  }
+})
 
 onMounted(async () => {
   // 关键修复：确保在加载 session 前配置 Monaco
@@ -994,6 +1060,21 @@ onUnmounted(() => {
               <el-icon size="18"><TicketsIcon /></el-icon>
               <span>Problem Description</span>
             </div>
+
+            <!-- OCR 上传按钮 -->
+            <el-button
+              size="small"
+              @click="handleOCRUpload"
+              :enabled="!ocrUploading"
+              class="!h-8 !px-3 !text-sm !bg-white/20 hover:!bg-white/30 font-medium flex items-center gap-1"
+              style="--el-button-text-color: white; --el-button-hover-text-color: white"
+            >
+              <el-icon size="16" class="text-white">
+                <el-icon v-if="!ocrUploading"><UploadIcon /></el-icon>
+                <el-icon v-else class="animate-spin"><LoadingIcon /></el-icon>
+              </el-icon>
+              <span class="hidden md:inline">OCR Upload</span>
+            </el-button>
           </div>
           <div class="p-4">
             <!-- 关键修复：使用 v-model 和 safeDescription 计算属性 -->
@@ -1073,13 +1154,14 @@ onUnmounted(() => {
               :options="{
                 fontSize: 14,
                 lineNumbers: 'on',
-                minimap: { enabled: false },
+                minimap: { enabled: true },
                 automaticLayout: true,
                 scrollBeyondLastLine: false,
                 padding: { top: 16, bottom: 16 },
                 rulers: [80],
-                tabSize: 2,
+                tabSize: 4,
                 insertSpaces: true,
+                renderWhitespace: 'selection',
               }"
               class="h-full"
             />
@@ -1147,21 +1229,22 @@ onUnmounted(() => {
           <div class="h-[320px]">
             <MonacoEditor
               v-if="session.std_code"
-              :value="session.std_code.content || ''"
               @editorDidMount="onStdEditorMounted"
               @change="handleStdCodeChanged"
+              :value="session.std_code.content || ''"
               :language="stdLanguage === 'c' ? 'c' : 'cpp'"
               theme="vs-dark"
               :options="{
                 fontSize: 14,
                 lineNumbers: 'on',
-                minimap: { enabled: false },
+                minimap: { enabled: true },
                 automaticLayout: true,
                 scrollBeyondLastLine: false,
                 padding: { top: 16, bottom: 16 },
                 rulers: [80],
-                tabSize: 2,
+                tabSize: 4,
                 insertSpaces: true,
+                renderWhitespace: 'selection',
               }"
               class="h-full"
             />
@@ -1212,13 +1295,14 @@ onUnmounted(() => {
               :options="{
                 fontSize: 14,
                 lineNumbers: 'on',
-                minimap: { enabled: false },
+                minimap: { enabled: true },
                 automaticLayout: true,
                 scrollBeyondLastLine: false,
                 padding: { top: 16, bottom: 16 },
                 rulers: [80],
-                tabSize: 2,
+                tabSize: 4,
                 insertSpaces: true,
+                renderWhitespace: 'selection',
               }"
               class="h-full"
             />
@@ -1401,6 +1485,50 @@ onUnmounted(() => {
       </el-button>
     </div>
   </div>
+
+  <el-dialog
+    v-model="ocrDialogVisible"
+    title="Upload Image for OCR"
+    width="500px"
+    @close="resetOCRState"
+  >
+    <div class="space-y-4">
+      <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50">
+        <el-icon name="upload" class="text-4xl text-gray-400 mb-3"></el-icon>
+        <p class="text-gray-600 mb-2">Drop image here or click to upload</p>
+        <p class="text-gray-600 mb-2">You can also paste an image directly (Ctrl+V)</p>
+        <p class="text-sm text-gray-500">Supports JPG, PNG, GIF (Max 5MB)</p>
+
+        <el-upload
+          class="mt-4"
+          drag
+          :auto-upload="false"
+          :show-file-list="false"
+          accept="image/*"
+          :on-change="handleOCRFileChange"
+        >
+          <el-button type="primary">Select Image</el-button>
+        </el-upload>
+      </div>
+
+      <div v-if="ocrImageUrl" class="mt-4">
+        <p class="text-sm text-gray-600 mb-2">Preview:</p>
+        <img
+          :src="ocrImageUrl"
+          alt="OCR Preview"
+          class="max-w-full h-48 object-contain rounded border"
+        />
+      </div>
+
+      <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+        <el-button @click="resetOCRState">Cancel</el-button>
+        <el-button type="primary" @click="performOCR">
+          <el-icon class="mr-1"><Camera /></el-icon>
+          Perform OCR
+        </el-button>
+      </div>
+    </div>
+  </el-dialog>
 </template>
 
 <style scoped>

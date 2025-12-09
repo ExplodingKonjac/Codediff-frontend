@@ -129,62 +129,12 @@ body {
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05) !important;
   }
 }
-/* Monaco Editor 全局样式 */
-.monaco-editor {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace !important;
+
+.el-message-box {
+  --el-messagebox-border-radius: 16px !important;
+  padding: 16px !important;
 }
 
-.monaco-editor .margin {
-  background-color: #252526 !important;
-}
-
-.monaco-editor .line-numbers {
-  color: #6e7681 !important;
-  width: 40px !important;
-}
-
-.monaco-editor .cursor {
-  background-color: #fff !important;
-}
-
-/* 滚动条样式优化 */
-.monaco-editor .overflow-guard {
-  scrollbar-width: thin;
-  scrollbar-color: #60a5fa #1e1e1e;
-}
-
-.monaco-editor .overflow-guard::-webkit-scrollbar {
-  width: 8px;
-}
-
-.monaco-editor .overflow-guard::-webkit-scrollbar-track {
-  background: #1e1e1e;
-}
-
-.monaco-editor .overflow-guard::-webkit-scrollbar-thumb {
-  background: #60a5fa;
-  border-radius: 4px;
-}
-
-.monaco-editor .overflow-guard::-webkit-scrollbar-thumb:hover {
-  background: #3b82f6;
-}
-
-/* 修复 MonacoEditor 样式问题 */
-.monaco-editor {
-  height: 100% !important;
-  width: 100% !important;
-}
-
-.monaco-editor .margin {
-  background-color: #252526 !important;
-}
-
-.monaco-editor .view-line {
-  line-height: 1.5 !important;
-}
-
-/* 修复滚动条在某些浏览器中的问题 */
-.monaco-editor .overflow-guard {
-  overflow: hidden !important;
+.el-card {
+  --el-card-border-radius: 16px !important;
 }

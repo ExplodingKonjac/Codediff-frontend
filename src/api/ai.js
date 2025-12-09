@@ -6,3 +6,14 @@ export const generateCode = (type, sessionId) => {
     session_id: sessionId 
   })
 }
+
+export const ocr = (image) => {
+  const formData = new FormData()
+  formData.append('image', image)
+
+  return api.post('/ai/ocr', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
