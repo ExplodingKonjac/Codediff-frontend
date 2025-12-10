@@ -631,7 +631,6 @@ const startContinuousGeneration = async () => {
   }
 
   session.value.test_cases = []
-  session.value = { ...session.value }
   diffFailed.value = false
 
   currentStatus.value = 'Starting continuous diff...'
@@ -800,30 +799,17 @@ const generateCodeStreaming = async (type) => {
         )
 
         // 更新 session 数据
-        if (type === 'generator') {
-          if (!session.value.gen_code) {
-            session.value.gen_code = {
-              lang: 'cpp',
-              std: 'c++17',
-              content: aiStreaming.value.generator.content,
-            }
-          } else {
-            session.value.gen_code.content = aiStreaming.value.generator.content
-            session.value.gen_code.lang = 'cpp'
-            session.value.gen_code.std = 'c++17'
+        const key = type === 'generator' ? 'gen_code' : 'std_code'
+        if (!session.value[key]) {
+          session.value[key] = {
+            lang: 'cpp',
+            std: 'c++17',
+            content: aiStreaming.value[type].content,
           }
-        } else if (type === 'standard') {
-          if (!session.value.std_code) {
-            session.value.std_code = {
-              lang: 'cpp',
-              std: 'c++17',
-              content: aiStreaming.value.standard.content,
-            }
-          } else {
-            session.value.std_code.content = aiStreaming.value.standard.content
-            session.value.std_code.lang = 'cpp'
-            session.value.std_code.std = 'c++17'
-          }
+        } else {
+          session.value[key].content = aiStreaming.value[type].content
+          session.value[key].lang = 'cpp'
+          session.value[key].std = 'c++17'
         }
 
         // 标记为未保存
@@ -931,13 +917,7 @@ const performOCR = async () => {
     const response = await apiOcr(ocrImageFile.value)
 
     if (response.data && response.data.text) {
-      // 将识别的文本追加到题目描述
-      if (session.value.description) {
-        session.value.description += '\n\n' + response.data.text
-      } else {
-        session.value.description = response.data.text
-      }
-
+      session.value.description = response.data.text
       ElMessage.success('OCR completed successfully')
       markUnsaved()
     } else {

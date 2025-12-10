@@ -440,9 +440,7 @@ onMounted(() => {
           placeholder="https://api.example.com/v1/chat/completions"
           type="url"
         />
-        <p class="text-xs text-gray-400 mt-1">
-          Example: https://api.openai.com/v1/chat/completions
-        </p>
+        <p class="text-xs text-gray-400 mt-1">Example: https://api.openai.com/v1/</p>
       </el-form-item>
 
       <el-form-item label="AI Model" prop="ai_model">
