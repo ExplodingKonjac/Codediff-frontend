@@ -8,7 +8,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 export const api = axios.create({
   baseURL: API_URL,
   timeout: 30000,
-  withCredentials: import.meta.env.DEV ? false : true,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -28,10 +28,7 @@ export const authApi = axios.create({
 // 普通请求拦截器
 api.interceptors.request.use(
   config => {
-    const authStore = useAuthStore()
-    if (authStore.token) {
-      config.headers.Authorization = `Bearer ${authStore.token}`
-    }
+    // Cookie-based auth handled by browser automatically
     return config
   },
   error => {
@@ -42,10 +39,7 @@ api.interceptors.request.use(
 // 认证请求拦截器（用于登录/注册等）
 authApi.interceptors.request.use(
   config => {
-    const authStore = useAuthStore()
-    if (authStore.token && !config.url.includes('/auth/login') && !config.url.includes('/auth/register')) {
-      config.headers.Authorization = `Bearer ${authStore.token}`
-    }
+    // Cookie-based auth handled by browser automatically
     return config
   },
   error => {

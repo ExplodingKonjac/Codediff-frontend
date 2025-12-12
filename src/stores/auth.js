@@ -7,14 +7,14 @@ import { sendVerificationCode as sendCodeApi } from '@/api/auth'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    token: localStorage.getItem('token') || '',
+    // token: localStorage.getItem('token') || '', // No longer used
     user: JSON.parse(localStorage.getItem('user')) || null,
     loading: false,
     error: null
   }),
   
   getters: {
-    isAuthenticated: (state) => !!state.token && !!state.user,
+    isAuthenticated: (state) => !!state.user,
     username: (state) => state.user?.username || 'Guest',
     userId: (state) => state.user?.id,
     aiModel: (state) => state.user?.ai_model || ''
@@ -31,11 +31,11 @@ export const useAuthStore = defineStore('auth', {
         // 确保从响应中正确获取数据
         const data = response.data
         
-        this.token = data.access_token
+        // this.token = data.access_token // No token
         this.user = data.user
         
         // 保存到本地存储
-        localStorage.setItem('token', this.token)
+        // localStorage.setItem('token', this.token)
         localStorage.setItem('user', JSON.stringify(this.user))
         
         ElMessage.success(`Welcome back, ${this.username}!`)
@@ -62,10 +62,10 @@ export const useAuthStore = defineStore('auth', {
         
         const data = response.data
         
-        this.token = data.access_token
+        // this.token = data.access_token
         this.user = data.user
         
-        localStorage.setItem('token', this.token)
+        // localStorage.setItem('token', this.token)
         localStorage.setItem('user', JSON.stringify(this.user))
         
         ElMessage.success(`Registration successful, ${this.username}!`)
@@ -133,9 +133,9 @@ export const useAuthStore = defineStore('auth', {
     },
     
     logout() {
-      this.token = ''
+      // this.token = ''
       this.user = null
-      localStorage.removeItem('token')
+      // localStorage.removeItem('token')
       localStorage.removeItem('user')
       
       // 重定向到登录页    
