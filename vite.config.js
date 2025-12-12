@@ -27,10 +27,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'monaco-editor': ['monaco-editor', 'vue-monaco'],
-          'element-plus': ['element-plus'],
-          'vue-vendor': ['vue', 'vue-router', 'pinia', 'axios'],
-          'file-icons': ['@element-plus/icons-vue'],
+          'monaco-editor': ['monaco-editor'],
+          // 'element-plus': ['element-plus'],
+          // 'vue-vendor': ['vue', 'vue-router', 'pinia', 'axios'],
+          // 'file-icons': ['@element-plus/icons-vue'],
         }
       }
     },
