@@ -13,7 +13,9 @@ export default defineConfig({
     vue(),
     VueDevtools(),
     tailwindcss(),
-    monacoEditorPlugin.default({}),
+    monacoEditorPlugin.default({
+      languages: ['cpp', 'c'],
+    }),
     commonjs(),
   ],
   resolve: {
@@ -25,7 +27,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'monaco-editor': ['monaco-editor'],
+          'monaco-editor': ['monaco-editor', 'vue-monaco'],
           'element-plus': ['element-plus'],
           'vue-vendor': ['vue', 'vue-router', 'pinia', 'axios'],
           'file-icons': ['@element-plus/icons-vue'],
@@ -39,11 +41,7 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       'monaco-editor',
-      `monaco-editor/esm/vs/language/json/json.worker`,
-      `monaco-editor/esm/vs/language/css/css.worker`,
-      `monaco-editor/esm/vs/language/html/html.worker`,
-      `monaco-editor/esm/vs/language/typescript/ts.worker`,
-      `monaco-editor/esm/vs/editor/editor.worker`
+      'monaco-editor/esm/vs/editor/editor.worker',
     ],
   },
   server: {

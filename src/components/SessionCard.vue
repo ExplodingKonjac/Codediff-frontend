@@ -3,7 +3,8 @@ import { computed, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { updateSession, deleteSession } from '@/api/sessions' // 新增导入
+import { updateSession, deleteSession } from '@/api/sessions'
+import { formatDate } from '@/utils/date'
 // 使用正确的图标导入
 import {
   Edit as EditIcon,
@@ -159,10 +160,9 @@ const handleDelete = async (event) => {
             </el-avatar>
             <span class="text-sm font-medium text-gray-700">{{ authStore.username }}</span>
           </div>
+
           <span class="text-sm text-gray-500">•</span>
-          <span class="text-sm text-gray-500">{{
-            new Date(session.created_at).toLocaleDateString()
-          }}</span>
+          <span class="text-sm text-gray-500">{{ formatDate(session.created_at) }}</span>
         </div>
 
         <!-- <div class="flex items-center gap-2">

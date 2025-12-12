@@ -1,11 +1,8 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { getSessions, createSession } from '@/api/sessions'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import SessionCard from '@/components/SessionCard.vue'
-// 正确导入图标
 import {
   Plus as PlusIcon,
   RefreshRight as RefreshRightIcon,
@@ -13,198 +10,26 @@ import {
   DocumentRemove as DocumentRemoveIcon,
 } from '@element-plus/icons-vue'
 
+import { useSessionsList } from '@/composables/useSessionsList'
+
 const authStore = useAuthStore()
 const router = useRouter()
-const sessions = ref([])
-const loading = ref(true)
 
-// ===== 新增：分页和排序状态 =====
-const pagination = ref({
-  page: 1,
-  per_page: 10,
-  total: 0,
-  pages: 0,
-})
-
-const sortOptions = [
-  { label: 'Update time', value: 'updated_at' },
-  { label: 'Create time', value: 'created_at' },
-  { label: 'Title', value: 'title' },
-]
-
-const sortOrderOptions = [
-  { label: 'Descending', value: 'desc' },
-  { label: 'Ascending', value: 'asc' },
-]
-
-const sortConfig = ref({
-  sort: 'updated_at',
-  order: 'desc',
-})
-
-// ===== 新增：获取分页会话列表 =====
-const fetchSessions = async () => {
-  try {
-    loading.value = true
-
-    const response = await getSessions({
-      page: pagination.value.page,
-      per_page: pagination.value.per_page,
-      sort: sortConfig.value.sort,
-      order: sortConfig.value.order,
-    })
-
-    sessions.value = response.data.sessions || []
-    pagination.value = {
-      page: response.data.page,
-      per_page: response.data.per_page,
-      total: response.data.total,
-      pages: response.data.pages,
-    }
-
-    console.log('Pagination:', pagination.value)
-  } catch (error) {
-    console.error('Failed to load sessions:', error)
-    ElMessage.error(`Failed to load sessions: ${error.message}`)
-  } finally {
-    loading.value = false
-  }
-}
-
-// ===== 新增：分页变更处理 =====
-const handlePageChange = (page) => {
-  pagination.value.page = page
-  fetchSessions()
-}
-
-const handlePageSizeChange = (size) => {
-  pagination.value.per_page = size
-  pagination.value.page = 1 // 重置到第一页
-  fetchSessions()
-}
-
-// ===== 新增：排序变更处理 =====
-const handleSortChange = () => {
-  pagination.value.page = 1 // 排序变化时重置到第一页
-  fetchSessions()
-}
-
-const createNewSession = async () => {
-  try {
-    loading.value = true
-
-    // 创建默认会话数据
-    const defaultSessionData = {
-      title: `New Session ${sessions.value.length + 1}`,
-      description: '',
-      user_code: {
-        lang: 'cpp',
-        std: 'c++17',
-        content: `#include <iostream>
-using namespace std;
-
-int main() {
-    // Your code here
-    int a, b;
-    cin >> a >> b;
-    cout << a + b << endl;
-    return 0;
-}`,
-      },
-      std_code: {
-        lang: 'cpp',
-        std: 'c++17',
-        content: `#include <iostream>
-using namespace std;
-
-int main() {
-    // Standard solution
-    int a, b;
-    cin >> a >> b;
-    cout << a + b << endl;
-    return 0;
-}`,
-      },
-      gen_code: {
-        lang: 'cpp',
-        std: 'c++17',
-        content: `#include <iostream>
-#include <random>
-using namespace std;
-
-int main() {
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_int_distribution<> dis(1, 100);
-    
-    int a = dis(gen);
-    int b = dis(gen);
-    cout << a << " " << b << endl;
-    return 0;
-}`,
-      },
-    }
-
-    // 调用 API 创建新会话
-    const response = await createSession(defaultSessionData)
-
-    if (response.data && response.data.id) {
-      // 获取新创建的会话数据
-      const newSession = response.data
-
-      // 添加到会话列表
-      sessions.value.unshift(newSession)
-
-      ElMessage.success('New session created successfully!')
-
-      // 跳转到新会话详情页
-      router.push(`/sessions/${newSession.id}`)
-    } else {
-      throw new Error('Invalid response from server')
-    }
-  } catch (error) {
-    console.error('Create session error:', error)
-
-    // 详细的错误处理
-    let errorMessage = 'Failed to create session'
-    if (error.response) {
-      // 服务器响应错误
-      if (error.response.status === 401) {
-        errorMessage = 'Authentication required. Please login again.'
-        authStore.logout()
-        router.push('/login')
-      } else if (error.response.status === 400) {
-        errorMessage = error.response.data?.message || 'Invalid session data'
-      } else if (error.response.status === 500) {
-        errorMessage = 'Server error. Please try again later.'
-      } else {
-        errorMessage = `Server error (${error.response.status})`
-      }
-    } else if (error.request) {
-      // 请求已发送但无响应
-      errorMessage = 'Network error. Please check your connection.'
-    } else {
-      // 其他错误
-      errorMessage = error.message || 'Unknown error occurred'
-    }
-
-    ElMessage.error(errorMessage)
-  } finally {
-    loading.value = false
-  }
-}
-
-// 修复：使用 Vue 事件处理而不是 window 事件
-const handleTitleUpdated = ({ id, title }) => {
-  const session = sessions.value.find((s) => s.id === id)
-  if (session) {
-    session.title = title
-  }
-}
-
-const handleSessionDeleted = ({ id }) => {
-  sessions.value = sessions.value.filter((s) => s.id !== id)
-}
+const {
+  sessions,
+  loading,
+  pagination,
+  sortConfig,
+  sortOptions,
+  sortOrderOptions,
+  fetchSessions,
+  handlePageChange,
+  handlePageSizeChange,
+  handleSortChange,
+  createNewSession,
+  handleTitleUpdated,
+  handleSessionDeleted,
+} = useSessionsList()
 
 onMounted(() => {
   if (authStore.isAuthenticated) {

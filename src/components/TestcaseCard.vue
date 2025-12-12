@@ -13,6 +13,7 @@ import {
   InfoFilled as InfoFilledIcon,
   Select as SelectIcon,
 } from '@element-plus/icons-vue'
+import { formatDate } from '@/utils/date'
 
 const props = defineProps({
   testcase: {
@@ -291,13 +292,6 @@ const handleContentClick = (event) => {
                 </div>
               </div>
               <div class="flex items-start gap-2">
-                <el-icon size="16" class="mt-0.5 text-green-600"><SuccessFilledIcon /></el-icon>
-                <div>
-                  <span class="text-sm text-gray-500">Test ID:</span>
-                  <span class="ml-2 font-medium">{{ testcase.id }}</span>
-                </div>
-              </div>
-              <div class="flex items-start gap-2">
                 <el-icon size="16" class="mt-0.5 text-gray-600"><InfoFilledIcon /></el-icon>
                 <div>
                   <span class="text-sm text-gray-500">Judgement:</span>
@@ -329,7 +323,7 @@ const handleContentClick = (event) => {
                 <div>
                   <span class="text-sm text-gray-500">Created:</span>
                   <span class="ml-2 font-medium text-gray-600">{{
-                    new Date(testcase.created_at).toLocaleString()
+                    formatDate(testcase.created_at)
                   }}</span>
                 </div>
               </div>
