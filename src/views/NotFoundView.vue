@@ -41,7 +41,7 @@ const goHome = () => {
         <div
           class="w-24 h-24 mx-auto mb-4 rounded-full bg-blue-100 flex items-center justify-center"
         >
-          <div class="text-4xl">⚡</div>
+          <img src="/logo.png" alt="CodeDiff Logo" class="h-12 w-auto" />
         </div>
         <p class="text-gray-500">CodeDiff - Program Verification Assistant</p>
       </div>

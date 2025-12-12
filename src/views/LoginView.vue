@@ -73,7 +73,7 @@ const handleBack = () => {
 
       <el-card class="border border-gray-200 shadow-lg">
         <div class="text-center mb-6">
-          <div class="text-4xl mb-2">⚡</div>
+          <img src="/logo.png" alt="CodeDiff Logo" class="h-16 w-auto mx-auto mb-4" />
           <h1 class="text-2xl font-bold text-gray-800">Welcome to CodeDiff</h1>
           <p class="text-gray-500 mt-1">Verify your code with ease</p>
         </div>

@@ -56,11 +56,9 @@ const handleNewSession = () => {
   >
     <div class="container mx-auto px-4 h-full flex items-center justify-between">
       <!-- 左侧: Logo + Title -->
-      <div class="flex items-center gap-2 cursor-pointer" @click="router.push('/')">
-        <div class="text-white text-3xl font-bold flex items-center gap-2">
-          <span class="text-4xl">⚡</span>
-          <span class="text-2xl font-extrabold tracking-wider">CodeDiff</span>
-        </div>
+      <div class="flex items-center gap-3 cursor-pointer" @click="router.push('/')">
+        <img src="/logo.png" alt="CodeDiff Logo" class="h-10 w-auto" />
+        <div class="text-white text-2xl font-extrabold tracking-wider">CodeDiff</div>
       </div>
 
       <!-- 右侧: 用户信息 -->
