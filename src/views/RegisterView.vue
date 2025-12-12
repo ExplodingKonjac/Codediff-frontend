@@ -16,13 +16,54 @@ import {
 
 const authStore = useAuthStore()
 const router = useRouter()
+const formRef = ref(null) // 表单引用
 const form = ref({
   username: '',
   email: '',
+  verificationCode: '', // 新增字段
   password: '',
   confirmPassword: '',
 })
 const loading = ref(false)
+const sendingCode = ref(false) // 发送验证码loading
+const countdown = ref(0) // 倒计时
+
+// 发送验证码
+const handleSendCode = async () => {
+  if (!form.value.email) {
+    ElMessage.warning('Please enter your email first')
+    return
+  }
+  // 简单验证邮箱格式
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email)) {
+    ElMessage.warning('Please enter a valid email address')
+    return
+  }
+
+  try {
+    sendingCode.value = true
+    const success = await authStore.sendVerificationCode(form.value.email)
+
+    if (success) {
+      // 开始倒计时
+      countdown.value = 60
+      const timer = setInterval(() => {
+        countdown.value--
+        if (countdown.value <= 0) {
+          clearInterval(timer)
+        }
+      }, 1000)
+    } else {
+      // 虽然 store 中已经有错误提示，但这能确保用户一定能看到反馈
+      if (!document.querySelector('.el-message--error')) {
+        ElMessage.error('Failed to send verification code. Please check your email and try again.')
+      }
+    }
+  } finally {
+    sendingCode.value = false
+  }
+}
+
 const rules = {
   username: [
     { required: true, message: 'Username is required', trigger: 'blur' },
@@ -36,6 +77,10 @@ const rules = {
   email: [
     { required: true, message: 'Email is required', trigger: 'blur' },
     { type: 'email', message: 'Please enter a valid email address', trigger: 'blur' },
+  ],
+  verificationCode: [
+    { required: true, message: 'Verification code is required', trigger: 'blur' },
+    { len: 6, message: 'Code must be 6 digits', trigger: 'blur' },
   ],
   password: [
     { required: true, message: 'Password is required', trigger: 'blur' },
@@ -61,6 +106,15 @@ function validatePasswordMatch(rule, value, callback) {
 }
 
 const handleSubmit = async () => {
+  if (!formRef.value) return
+
+  // 表单验证
+  try {
+    await formRef.value.validate()
+  } catch (error) {
+    return
+  }
+
   // 简单的前端验证
   if (form.value.password !== form.value.confirmPassword) {
     ElMessage.warning('Passwords do not match')
@@ -74,6 +128,7 @@ const handleSubmit = async () => {
       username: form.value.username.trim(),
       email: form.value.email.trim(),
       password: form.value.password,
+      verification_code: form.value.verificationCode.trim(), // 包含验证码
     }
 
     const success = await authStore.register(userData)
@@ -142,6 +197,7 @@ const strengthMeter = computed(() => {
         </div>
 
         <el-form
+          ref="formRef"
           @submit.prevent="handleSubmit"
           :model="form"
           :rules="rules"
@@ -182,6 +238,33 @@ const strengthMeter = computed(() => {
                 </el-icon>
               </template>
             </el-input>
+          </el-form-item>
+
+          <el-form-item label="Verification Code" prop="verificationCode">
+            <div class="flex gap-2">
+              <el-input
+                v-model="form.verificationCode"
+                placeholder="6-digit code"
+                size="large"
+                class="flex-1"
+                maxlength="6"
+                @keyup.enter="handleSubmit"
+              >
+                <template #prefix>
+                  <el-icon><KeyIcon /></el-icon>
+                </template>
+              </el-input>
+              <el-button
+                type="primary"
+                size="large"
+                :disabled="countdown > 0"
+                :loading="sendingCode"
+                @click="handleSendCode"
+                class="w-32"
+              >
+                {{ countdown > 0 ? `${countdown}s` : 'Send Code' }}
+              </el-button>
+            </div>
           </el-form-item>
 
           <el-form-item label="Password" prop="password">

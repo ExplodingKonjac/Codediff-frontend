@@ -437,7 +437,7 @@ onMounted(() => {
       <el-form-item label="AI API URL" prop="ai_api_url">
         <el-input
           v-model="aiForm.ai_api_url"
-          placeholder="https://api.example.com/v1/chat/completions"
+          placeholder="https://api.example.com/v1/"
           type="url"
         />
         <p class="text-xs text-gray-400 mt-1">Example: https://api.openai.com/v1/</p>

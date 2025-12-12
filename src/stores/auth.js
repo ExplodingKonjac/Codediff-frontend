@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
 import { authApi } from '@/api/request'
 import router from '@/router/index'
 import { ElMessage } from 'element-plus'
+import { sendVerificationCode as sendCodeApi } from '@/api/auth'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -78,6 +80,18 @@ export const useAuthStore = defineStore('auth', {
         return false
       } finally {
         this.loading = false
+      }
+    },
+
+    async sendVerificationCode(email) {
+      try {
+        await sendCodeApi(email)
+        ElMessage.success('Verification code sent! Please check your email (or server console in development)')
+        return true
+      } catch (error) {
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to send code'
+        ElMessage.error(errorMessage)
+        return false
       }
     },
     

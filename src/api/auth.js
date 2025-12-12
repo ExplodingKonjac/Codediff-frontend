@@ -4,6 +4,10 @@ export const login = (credentials) => {
   return authApi.post('/auth/login', credentials)
 }
 
+export const sendVerificationCode = (email) => {
+  return authApi.post('/auth/send-code', { email })
+}
+
 export const register = (userData) => {
   return authApi.post('/auth/register', userData)
 }
