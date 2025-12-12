@@ -8,28 +8,24 @@ import { stopContinuousDiff as apiStopContinuousDiff } from '@/api/diff'
 import { ocr as apiOcr } from '@/api/ai'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import MonacoEditor from 'vue-monaco'
-import TestcaseCard from '@/components/TestcaseCard.vue'
-// 正确导入图标
 import {
   ArrowLeftBold as ArrowLeftBoldIcon,
-  Refresh as RefreshIcon,
-  VideoPlay as VideoPlayIcon,
-  Close as CloseIcon,
   Document as DocumentIcon,
-  DocumentChecked as DocumentCheckedIcon,
-  Warning as WarningIcon,
-  FolderOpened as FolderOpenedIcon,
-  Delete as DeleteIcon,
-  House as HouseIcon,
-  MagicStick as MagicStickIcon,
-  User as UserIcon,
-  SuccessFilled as SuccessFilledIcon,
-  DataAnalysis as DataAnalysisIcon,
-  Tickets as TicketsIcon,
   Edit as EditIcon,
-  Loading as LoadingIcon,
-  Upload as UploadIcon,
+  Delete as DeleteIcon,
+  DataAnalysis as DataAnalysisIcon,
+  SuccessFilled as SuccessFilledIcon,
+  User as UserIcon,
+  Warning as WarningIcon,
+  House as HouseIcon,
 } from '@element-plus/icons-vue'
+
+// New Components
+import CodeBlock from '@/components/session/CodeBlock'
+import ProblemDescription from '@/components/session/ProblemDescription'
+import OCRDialog from '@/components/session/OCRDialog'
+import ControlPanel from '@/components/session/ControlPanel'
+import TestCasesList from '@/components/session/TestCasesList'
 
 MonacoEditor.render = () => h('div')
 
@@ -833,13 +829,6 @@ const generateCodeStreaming = async (type) => {
         stopAIGeneration(type)
       }
     })
-
-    // 连接错误
-    aiSSEClient[type].onerror = (error) => {
-      console.error('AI SSE connection error:', error)
-      ElMessage.error('AI connection failed')
-      stopAIGeneration(type)
-    }
   } catch (error) {
     console.error('Failed to start AI generation:', error)
     ElMessage.error(`Failed to start AI generation: ${error.message || 'Unknown error'}`)
@@ -1032,483 +1021,97 @@ onUnmounted(() => {
       <!-- Left Column: Code Editors (2/3) -->
       <div class="col-span-2 code-section pr-3 space-y-6">
         <!-- 题目描述 -->
-        <div class="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden">
-          <div
-            class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-500 to-cyan-600 text-white"
-          >
-            <div class="flex items-center gap-3 font-medium text-lg">
-              <el-icon size="18"><TicketsIcon /></el-icon>
-              <span>Problem Description</span>
-            </div>
+        <ProblemDescription
+          v-model="safeDescription"
+          :ocr-uploading="ocrUploading"
+          @upload-ocr="handleOCRUpload"
+          @update:modelValue="markUnsaved"
+        />
 
-            <!-- OCR 上传按钮 -->
-            <el-button
-              size="small"
-              @click="handleOCRUpload"
-              :enabled="!ocrUploading"
-              class="!h-8 !px-3 !text-sm !bg-white/20 hover:!bg-white/30 font-medium flex items-center gap-1"
-              style="--el-button-text-color: white; --el-button-hover-text-color: white"
-            >
-              <el-icon size="16" class="text-white">
-                <el-icon v-if="!ocrUploading"><UploadIcon /></el-icon>
-                <el-icon v-else class="animate-spin"><LoadingIcon /></el-icon>
-              </el-icon>
-              <span class="hidden md:inline">OCR Upload</span>
-            </el-button>
-          </div>
-          <div class="p-4">
-            <!-- 关键修复：使用 v-model 和 safeDescription 计算属性 -->
-            <el-input
-              type="textarea"
-              v-model="safeDescription"
-              :rows="3"
-              placeholder="Describe the problem requirements and constraints..."
-              class="!border-none !shadow-none"
-              @input="markUnsaved()"
-            />
-          </div>
-        </div>
+        <!-- 数据生成器 -->
+        <CodeBlock
+          title="Generator (C++/testlib)"
+          :icon="DataAnalysisIcon"
+          header-class="bg-gradient-to-r from-purple-600 to-indigo-700"
+          v-model="session.gen_code"
+          type="generator"
+          :ai-enabled="true"
+          :ai-loading="aiStreaming.generator.loading"
+          @editor-mount="onGenEditorMounted"
+          @change="handleGenCodeChanged"
+          @generate="generateCodeStreaming('generator')"
+          @stop-generate="stopAIGeneration('generator')"
+          @update:modelValue="markUnsaved"
+        />
 
-        <!-- 数据生成器 (带AI按钮和语言选择) -->
-        <div class="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden">
-          <div
-            class="flex items-center justify-between p-4 bg-gradient-to-r from-purple-600 to-indigo-700 text-white"
-          >
-            <div class="flex items-center gap-3 font-medium text-lg">
-              <el-icon size="18"><DataAnalysisIcon /></el-icon>
-              <span>Generator (C++/testlib)</span>
-            </div>
-            <div class="flex items-center gap-3">
-              <div class="flex items-center gap-2">
-                <span class="text-sm hidden md:inline">Language:</span>
-                <el-select v-model="genLanguage" size="small" class="!w-24">
-                  <el-option
-                    v-for="lang in languageOptions"
-                    :key="lang.value"
-                    :label="lang.label"
-                    :value="lang.value"
-                  />
-                </el-select>
-                <el-select v-model="genVersion" size="small" class="!w-24">
-                  <el-option
-                    v-for="version in languageOptions.find((l) => l.value === genLanguage)
-                      ?.versions || []"
-                    :key="version"
-                    :label="version.toUpperCase()"
-                    :value="version"
-                  />
-                </el-select>
-              </div>
-              <div class="flex items-center">
-                <el-button
-                  v-if="!aiStreaming.generator.loading"
-                  size="small"
-                  @click="generateCodeStreaming('generator')"
-                  class="!h-8 !px-3 !text-sm !bg-white/20 hover:!bg-white/30 font-medium flex items-center gap-1"
-                  style="--el-button-text-color: white; --el-button-hover-text-color: white"
-                >
-                  <el-icon size="16" class="text-white"><MagicStickIcon /></el-icon>
-                  <span class="hidden md:inline">AI Generate</span>
-                </el-button>
-                <el-button
-                  v-else
-                  size="small"
-                  @click="stopAIGeneration('generator')"
-                  class="!h-8 !px-3 !text-sm !bg-red-500/20 hover:!bg-red-500/30 font-medium text-white flex items-center gap-1"
-                  style="--el-button-text-color: white; --el-button-hover-text-color: white"
-                >
-                  <el-icon size="16" class="text-white animate-spin"><LoadingIcon /></el-icon>
-                  <span class="hidden md:inline">Generating...</span>
-                </el-button>
-              </div>
-            </div>
-          </div>
-          <div class="h-[320px]">
-            <MonacoEditor
-              v-if="session.gen_code"
-              :value="session.gen_code.content || ''"
-              @editorDidMount="onGenEditorMounted"
-              @change="handleGenCodeChanged"
-              :language="genLanguage === 'c' ? 'c' : 'cpp'"
-              theme="vs-dark"
-              :options="{
-                fontSize: 14,
-                lineNumbers: 'on',
-                minimap: { enabled: true },
-                automaticLayout: true,
-                scrollBeyondLastLine: false,
-                padding: { top: 16, bottom: 16 },
-                rulers: [80],
-                tabSize: 4,
-                insertSpaces: true,
-                renderWhitespace: 'selection',
-              }"
-              class="h-full"
-            />
-            <!-- 添加加载状态 -->
-            <div v-else class="h-full flex items-center justify-center">
-              <el-skeleton :rows="10" animated />
-            </div>
-          </div>
-        </div>
+        <!-- 标准代码 -->
+        <CodeBlock
+          title="Standard Code"
+          :icon="SuccessFilledIcon"
+          header-class="bg-gradient-to-r from-green-600 to-emerald-700"
+          v-model="session.std_code"
+          type="standard"
+          :ai-enabled="true"
+          :ai-loading="aiStreaming.standard.loading"
+          @editor-mount="onStdEditorMounted"
+          @change="handleStdCodeChanged"
+          @generate="generateCodeStreaming('standard')"
+          @stop-generate="stopAIGeneration('standard')"
+          @update:modelValue="markUnsaved"
+        />
 
-        <!-- 标准代码 (带AI按钮和语言选择) -->
-        <div class="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden">
-          <div
-            class="flex items-center justify-between p-4 bg-gradient-to-r from-green-600 to-emerald-700 text-white"
-          >
-            <div class="flex items-center gap-3 font-medium text-lg">
-              <el-icon size="18"><SuccessFilledIcon /></el-icon>
-              <span>Standard Code</span>
-            </div>
-            <div class="flex items-center gap-3">
-              <div class="flex items-center gap-2">
-                <span class="text-sm hidden md:inline">Language:</span>
-                <el-select v-model="stdLanguage" size="small" class="!w-24">
-                  <el-option
-                    v-for="lang in languageOptions"
-                    :key="lang.value"
-                    :label="lang.label"
-                    :value="lang.value"
-                  />
-                </el-select>
-                <el-select v-model="stdVersion" size="small" class="!w-24">
-                  <el-option
-                    v-for="version in languageOptions.find((l) => l.value === stdLanguage)
-                      ?.versions || []"
-                    :key="version"
-                    :label="version.toUpperCase()"
-                    :value="version"
-                  />
-                </el-select>
-              </div>
-              <div class="flex items-center">
-                <el-button
-                  v-if="!aiStreaming.standard.loading"
-                  size="small"
-                  @click="generateCodeStreaming('standard')"
-                  class="!h-8 !px-3 !text-sm !bg-white/20 hover:!bg-white/30 font-medium text-white flex items-center gap-1"
-                  style="--el-button-text-color: white; --el-button-hover-text-color: white"
-                >
-                  <el-icon size="16" class="text-white"><MagicStickIcon /></el-icon>
-                  <span class="hidden md:inline">AI Generate</span>
-                </el-button>
-                <el-button
-                  v-else
-                  size="small"
-                  @click="stopAIGeneration('standard')"
-                  class="!h-8 !px-3 !text-sm !bg-red-500/20 hover:!bg-red-500/30 font-medium text-white flex items-center gap-1"
-                  style="--el-button-text-color: white; --el-button-hover-text-color: white"
-                >
-                  <el-icon size="16" class="text-white animate-spin"><LoadingIcon /></el-icon>
-                  <span class="hidden md:inline">Generating...</span>
-                </el-button>
-              </div>
-            </div>
-          </div>
-          <div class="h-[320px]">
-            <MonacoEditor
-              v-if="session.std_code"
-              @editorDidMount="onStdEditorMounted"
-              @change="handleStdCodeChanged"
-              :value="session.std_code.content || ''"
-              :language="stdLanguage === 'c' ? 'c' : 'cpp'"
-              theme="vs-dark"
-              :options="{
-                fontSize: 14,
-                lineNumbers: 'on',
-                minimap: { enabled: true },
-                automaticLayout: true,
-                scrollBeyondLastLine: false,
-                padding: { top: 16, bottom: 16 },
-                rulers: [80],
-                tabSize: 4,
-                insertSpaces: true,
-                renderWhitespace: 'selection',
-              }"
-              class="h-full"
-            />
-            <div v-else class="h-full flex items-center justify-center">
-              <el-skeleton :rows="10" animated />
-            </div>
-          </div>
-        </div>
-
-        <!-- 用户代码 (带语言选择) -->
-        <div class="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden">
-          <div
-            class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-600 to-cyan-700 text-white"
-          >
-            <div class="flex items-center gap-3 font-medium text-lg">
-              <el-icon size="18"><UserIcon /></el-icon>
-              <span>User Code</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-sm hidden md:inline">Language:</span>
-              <el-select v-model="userLanguage" size="small" class="!w-24">
-                <el-option
-                  v-for="lang in languageOptions"
-                  :key="lang.value"
-                  :label="lang.label"
-                  :value="lang.value"
-                />
-              </el-select>
-              <el-select v-model="userVersion" size="small" class="!w-24">
-                <el-option
-                  v-for="version in languageOptions.find((l) => l.value === userLanguage)
-                    ?.versions || []"
-                  :key="version"
-                  :label="version.toUpperCase()"
-                  :value="version"
-                />
-              </el-select>
-            </div>
-          </div>
-          <div class="h-[320px]">
-            <MonacoEditor
-              v-if="session.user_code"
-              :value="session.user_code.content || ''"
-              @editorDidMount="onUserEditorMounted"
-              @change="handleUserCodeChanged"
-              :language="userLanguage === 'c' ? 'c' : 'cpp'"
-              theme="vs-dark"
-              :options="{
-                fontSize: 14,
-                lineNumbers: 'on',
-                minimap: { enabled: true },
-                automaticLayout: true,
-                scrollBeyondLastLine: false,
-                padding: { top: 16, bottom: 16 },
-                rulers: [80],
-                tabSize: 4,
-                insertSpaces: true,
-                renderWhitespace: 'selection',
-              }"
-              class="h-full"
-            />
-            <div v-else class="h-full flex items-center justify-center">
-              <el-skeleton :rows="10" animated />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right Column: Test Cases (1/3) -->
-      <div class="history-section flex flex-col">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-3">
-            <el-icon class="text-blue-500 text-2xl"><DocumentCheckedIcon /></el-icon>
-            <span>History Test Cases ({{ session.test_cases?.length || 0 }})</span>
-          </h2>
-        </div>
-
-        <!-- 失败信息 -->
-        <div
-          v-if="diffFailed"
-          class="flex flex-col items-center justify-center bg-red-50 rounded-xl border-2 border-dashed border-red-200 p-6"
-        >
-          <el-icon class="text-red-500 text-5xl mb-4"><WarningIcon /></el-icon>
-          <h3 class="text-xl font-bold text-red-700 mb-2">Diff Failed</h3>
-          <p class="text-gray-700 mb-4 text-center">{{ failureMessage }}</p>
-          <div
-            v-if="failureDetail"
-            class="w-full bg-white rounded-lg border border-red-200 p-4 max-h-64 overflow-y-auto font-mono text-sm"
-          >
-            <p class="text-red-600 whitespace-pre-wrap">{{ failureDetail }}</p>
-          </div>
-          <el-button type="danger" size="medium" @click="resetDiffState" class="mt-6 px-6 py-2">
-            <el-icon class="mr-1"><RefreshIcon /></el-icon>
-            Try Again
-          </el-button>
-        </div>
-
-        <!-- 测试用例容器 - 独立滚动区域 -->
-        <div v-else class="test-cases-container">
-          <div v-if="loading && !isGenerating" class="flex justify-center items-center h-64">
-            <el-skeleton :rows="6" animated class="w-full" />
-          </div>
-
-          <div
-            v-else-if="!session.test_cases || session.test_cases.length === 0"
-            class="flex flex-col items-center justify-center h-64 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300"
-          >
-            <el-icon class="text-gray-400 text-4xl mb-4"><FolderOpenedIcon /></el-icon>
-            <p class="text-lg text-gray-600 mb-2">
-              {{ isGenerating ? 'Generating test cases...' : 'No test cases yet' }}
-            </p>
-            <div v-if="isGenerating" class="mt-4">
-              <el-skeleton :rows="3" animated class="w-full max-w-md" />
-            </div>
-            <el-button
-              v-if="!isGenerating"
-              type="primary"
-              size="medium"
-              @click="startContinuousGeneration"
-              class="mt-2 px-4 py-2"
-            >
-              <el-icon class="mr-1"><RefreshIcon /></el-icon>
-              Generate First Test
-            </el-button>
-          </div>
-
-          <transition-group name="list" tag="div" class="space-y-3" v-else>
-            <TestcaseCard
-              v-for="(testcase, index) in session.test_cases"
-              :key="`${testcase.id}-${index}`"
-              :testcase="testcase"
-              :is-expanded="false"
-            />
-          </transition-group>
-        </div>
-
-        <!-- 固定的操作按钮区域 -->
-        <div class="action-buttons">
-          <div class="mb-4">
-            <div class="flex justify-between text-sm mb-1 font-medium">
-              <span>Current status: {{ currentStatus }}</span>
-            </div>
-          </div>
-
-          <!-- ===== 修正：max_tests 和 checker 控制器 ===== -->
-          <div class="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <!-- 垂直布局容器 -->
-            <div class="flex flex-col gap-3">
-              <!-- Max Tests 行 -->
-              <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-                <label class="text-sm font-medium text-gray-700 min-w-[80px]">Max Tests</label>
-                <el-input-number
-                  v-model="maxTests"
-                  :min="1"
-                  :max="1000"
-                  placeholder="Max tests to generate"
-                  class="w-full sm:w-auto flex-1"
-                />
-                <p class="text-xs text-gray-500 sm:text-right">Tests to generate (1-1000)</p>
-              </div>
-
-              <!-- Checker 选择器 -->
-              <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-                <label class="text-sm font-medium text-gray-700 min-w-[80px]">Checker</label>
-                <div class="w-full sm:w-auto flex-1">
-                  <el-select
-                    v-model="selectedChecker"
-                    placeholder="Select checker"
-                    class="w-full"
-                    :filterable="true"
-                  >
-                    <el-option
-                      v-for="checker in checkerOptions"
-                      :key="checker.value"
-                      :label="checker.label"
-                      :value="checker.value"
-                    >
-                      <el-popover trigger="hover" :content="checker.description" placement="right">
-                        <template #reference>
-                          <div class="flex justify-between items-center">
-                            {{ checker.label }}
-                          </div>
-                        </template>
-                      </el-popover>
-                    </el-option>
-                  </el-select>
-                </div>
-                <p class="text-xs text-gray-500 mt-1">Checker to judge outputs</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex flex-col sm:flex-row gap-3">
-            <el-button
-              v-if="!isGenerating"
-              type="primary"
-              size="large"
-              @click="startContinuousGeneration"
-              :disabled="loading"
-              class="flex-1 px-4 py-3 text-base font-medium shadow-md hover:shadow-lg transition-all"
-            >
-              <el-icon class="mr-1 text-lg"><RefreshIcon /></el-icon>
-              <span>Continuous Diff</span>
-            </el-button>
-
-            <el-button
-              v-if="isGenerating"
-              type="danger"
-              size="large"
-              @click="stopContinuousGeneration"
-              class="flex-1 px-4 py-3 text-base font-medium shadow-md hover:shadow-lg transition-all"
-            >
-              <el-icon class="mr-1 text-lg"><CloseIcon /></el-icon>
-              <span>Stop Diff</span>
-            </el-button>
-
-            <el-button
-              type="warning"
-              size="large"
-              @click="testExistingData"
-              :disabled="loading || !session.test_cases || session.test_cases.length === 0"
-              class="flex-1 px-4 py-3 text-base font-medium shadow-md hover:shadow-lg transition-all"
-            >
-              <el-icon class="mr-1 text-lg"><VideoPlayIcon /></el-icon>
-              <span>Rerun Tests</span>
-            </el-button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div v-else class="flex flex-col items-center justify-center h-96">
-      <el-icon class="text-yellow-500 text-6xl mb-6"><WarningIcon /></el-icon>
-      <p class="text-2xl text-gray-700 font-bold mb-4">Session not found</p>
-      <el-button type="primary" size="large" @click="router.push('/')" class="px-8 py-4 text-lg">
-        <el-icon class="mr-2"><HouseIcon /></el-icon>
-        Go to Home
-      </el-button>
-    </div>
-  </div>
-
-  <el-dialog
-    v-model="ocrDialogVisible"
-    title="Upload Image for OCR"
-    width="500px"
-    @close="resetOCRState"
-  >
-    <div class="space-y-4">
-      <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50">
-        <el-icon name="upload" class="text-4xl text-gray-400 mb-3"></el-icon>
-        <p class="text-gray-600 mb-2">Drop image here or click to upload</p>
-        <p class="text-gray-600 mb-2">You can also paste an image directly (Ctrl+V)</p>
-        <p class="text-sm text-gray-500">Supports JPG, PNG, GIF (Max 5MB)</p>
-
-        <el-upload
-          class="mt-4"
-          drag
-          :auto-upload="false"
-          :show-file-list="false"
-          accept="image/*"
-          :on-change="handleOCRFileChange"
-        >
-          <el-button type="primary">Select Image</el-button>
-        </el-upload>
-      </div>
-
-      <div v-if="ocrImageUrl" class="mt-4">
-        <p class="text-sm text-gray-600 mb-2">Preview:</p>
-        <img
-          :src="ocrImageUrl"
-          alt="OCR Preview"
-          class="max-w-full h-48 object-contain rounded border"
+        <!-- 用户代码 -->
+        <CodeBlock
+          title="User Code"
+          :icon="UserIcon"
+          header-class="bg-gradient-to-r from-blue-600 to-cyan-700"
+          v-model="session.user_code"
+          type="user"
+          :ai-enabled="false"
+          @editor-mount="onUserEditorMounted"
+          @change="handleUserCodeChanged"
+          @update:modelValue="markUnsaved"
         />
       </div>
 
-      <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-        <el-button @click="resetOCRState">Cancel</el-button>
-        <el-button type="primary" @click="performOCR">
-          <el-icon class="mr-1"><Camera /></el-icon>
-          Perform OCR
-        </el-button>
-      </div>
+      <!-- Right Column: Test Cases (1/3) -->
+      <TestCasesList
+        :test-cases="session.test_cases"
+        :loading="loading"
+        :is-generating="isGenerating"
+        :failed="diffFailed"
+        :failure-message="failureMessage"
+        :failure-detail="failureDetail"
+        @retry="resetDiffState"
+        @generate-first="startContinuousGeneration"
+      >
+        <template #actions>
+          <ControlPanel
+            v-model:max-tests="maxTests"
+            v-model:selected-checker="selectedChecker"
+            :checker-options="checkerOptions"
+            :current-status="currentStatus"
+            :is-generating="isGenerating"
+            :loading="loading"
+            :has-test-cases="session.test_cases && session.test_cases.length > 0"
+            @start="startContinuousGeneration"
+            @stop="stopContinuousGeneration"
+            @rerun="testExistingData"
+          />
+        </template>
+      </TestCasesList>
     </div>
-  </el-dialog>
+
+    <!-- OCR Dialog -->
+    <OCRDialog
+      v-model:visible="ocrDialogVisible"
+      :ocr-image-url="ocrImageUrl"
+      @cancel="resetOCRState"
+      @perform-ocr="performOCR"
+      @file-change="handleOCRFileChange"
+      @paste="handleOCRPaste"
+    />
+  </div>
 </template>
 
 <style scoped>
@@ -1525,220 +1128,5 @@ onUnmounted(() => {
   overflow-y: auto;
   padding-right: 15px;
 }
-.history-section {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100vh - 200px); /* 与左侧栏相同的高度限制 */
-  overflow: hidden; /* 防止内部溢出 */
-}
 
-/* 移除按钮背景 */
-.action-buttons {
-  padding: 20px 0;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-/* 确保下拉框内容完整显示 */
-:deep(.el-select__wrapper) {
-  overflow: visible !important;
-}
-
-:deep(.el-select-dropdown__item) {
-  white-space: nowrap !important;
-  overflow: visible !important;
-}
-
-/* 滚动条样式 */
-.test-cases-container {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 8px;
-  margin-bottom: 16px;
-  /* 精细滚动条样式 */
-  scrollbar-width: thin;
-  scrollbar-color: #94a3b8 #f1f3f5;
-}
-
-.test-cases-container::-webkit-scrollbar {
-  width: 8px;
-}
-
-.test-cases-container::-webkit-scrollbar-track {
-  background: #f1f3f5;
-  border-radius: 4px;
-}
-
-.test-cases-container::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border-radius: 4px;
-}
-
-.test-cases-container::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
-
-/* 操作按钮固定底部 */
-.action-buttons {
-  flex-shrink: 0; /* 确保按钮区域不收缩 */
-  padding: 16px 0;
-  background: white;
-  border-top: 1px solid #e2e8f0;
-  margin-top: auto; /* 推到容器底部 */
-}
-
-/* 响应式调整 */
-@media (max-width: 1024px) {
-  .history-section {
-    max-height: calc(100vh - 250px);
-  }
-
-  .action-buttons {
-    position: sticky;
-    bottom: 0;
-    background: white;
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
-  }
-}
-
-/* 状态显示样式 */
-.status-indicator {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 6px;
-}
-
-.status-success {
-  background-color: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
-}
-
-.status-error {
-  background-color: #ef4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
-}
-
-.status-warning {
-  background-color: #f59e0b;
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
-}
-
-.status-info {
-  background-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
-}
-
-/* 失败消息样式 */
-.failure-container {
-  border-radius: 16px !important;
-  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-  border: 2px solid #fecaca;
-}
-
-.failure-title {
-  font-size: 1.5rem !important;
-  font-weight: 700 !important;
-  color: #b91c1c !important;
-}
-
-.failure-message {
-  font-size: 1.1rem !important;
-  color: #454545 !important;
-}
-
-.failure-detail {
-  font-size: 0.9rem !important;
-  line-height: 1.6 !important;
-  max-height: 20rem !important;
-}
-
-/* 按钮加载动画 */
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* 按钮禁用状态 */
-button:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-/* 选择器样式优化 */
-:deep(.el-select .el-input__wrapper) {
-  border-radius: 6px !important;
-}
-
-:deep(.el-input-number .el-input__wrapper) {
-  border-radius: 6px !important;
-}
-
-/* 控制器区域样式 */
-.controller-group {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-/* 优化选项样式 */
-:deep(.el-select-dropdown__item) {
-  padding: 12px 16px !important;
-  line-height: 1.5 !important;
-}
-
-/* 优化 popover 样式 */
-:deep(.el-popover) {
-  max-width: 300px;
-  word-break: break-word;
-  line-height: 1.5;
-}
-
-/* 确保下拉菜单在顶部显示 */
-:deep(.el-select-dropdown) {
-  z-index: 9999 !important;
-}
-
-/* 选项悬浮效果 */
-:deep(.el-select-dropdown__item:hover) {
-  background-color: #f3f4f6 !important;
-}
-
-/* 响应式调整 */
-@media (max-width: 640px) {
-  .controller-group {
-    flex-direction: column !important;
-    gap: 12px !important;
-  }
-
-  .action-buttons {
-    position: sticky !important;
-    bottom: 0 !important;
-    background: white !important;
-    padding: 16px !important;
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05) !important;
-  }
-
-  /* 在小屏幕上，让输入框占据全宽 */
-  .controller-group > div {
-    width: 100% !important;
-  }
-
-  .controller-group .el-input-number,
-  .controller-group .el-select {
-    width: 100% !important;
-  }
-}
 </style>
