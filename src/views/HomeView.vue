@@ -86,14 +86,14 @@ onMounted(() => {
         <el-button
           type="primary"
           @click="createNewSession"
-          class="flex items-center gap-2 h-10 px-4 font-medium shadow-md hover:shadow-lg transition-shadow"
+          class="flex items-center gap-2 h-10 px-4"
         >
           <el-icon class="text-xl"><PlusIcon /></el-icon>
           <span>New Session</span>
         </el-button>
 
         <el-button
-          type="default"
+          type="success"
           @click="fetchSessions"
           :loading="loading"
           class="flex items-center gap-2 h-10 px-4"

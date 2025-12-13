@@ -181,7 +181,7 @@ const strengthMeter = computed(() => {
 
 <template>
   <div
-    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4"
+    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 pt-[var(--header-height)] -mt-[var(--header-height)]"
   >
     <div class="w-full max-w-md">
       <div class="mb-6 flex items-center gap-3 cursor-pointer" @click="handleBack">
@@ -350,18 +350,7 @@ const strengthMeter = computed(() => {
             </el-link>
           </div>
         </el-form>
-
-        <div class="mt-6 pt-6 border-t border-gray-200">
-          <p class="text-center text-sm text-gray-500">
-            This is a demo application for educational purposes. No real data is stored permanently.
-          </p>
-        </div>
       </el-card>
-
-      <div class="mt-8 text-center text-sm text-gray-400">
-        <p>CodeDiff © {{ new Date().getFullYear() }} - Program Verification Assistant</p>
-        <p class="mt-1">Designed for freshman programming course debugging</p>
-      </div>
     </div>
   </div>
 </template>

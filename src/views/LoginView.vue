@@ -63,7 +63,7 @@ const handleBack = () => {
 
 <template>
   <div
-    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4"
+    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 pt-[var(--header-height)] -mt-[var(--header-height)]"
   >
     <div class="w-full max-w-md">
       <div class="mb-6 flex items-center gap-3 cursor-pointer" @click="handleBack">
