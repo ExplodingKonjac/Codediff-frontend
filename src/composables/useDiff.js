@@ -5,8 +5,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 
 export function useDiff(session, sessionId, hasUnsavedChanges, saveSession) {
-  const authStore = useAuthStore()
-  
   const currentStatus = ref('Ready')
   const isGenerating = ref(false)
   const generatedCount = ref(0)
@@ -42,21 +40,18 @@ export function useDiff(session, sessionId, hasUnsavedChanges, saveSession) {
     }
 
     if (sessionId.value){
-        apiStopContinuousDiff(sessionId.value).catch((error) => {
+      apiStopContinuousDiff(sessionId.value).catch((error) => {
         console.error('Failed to stop continuous diff:', error)
-        })
+      })
     }
   }
 
   const getDiffSSEClient = (sseUrl) => {
-    const token = authStore.token
-    if (!token) throw new Error('Authentication required')
-
     const client = new EventSourcePolyfill(sseUrl.toString(), {
       headers: {
-        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
+      withCredentials: true,
       heartbeatTimeout: 30000,
       connectionTimeout: 10000,
     })
@@ -100,8 +95,8 @@ export function useDiff(session, sessionId, hasUnsavedChanges, saveSession) {
         if (!data.test_case) return
 
         const newTestCase = {
-          id: session.value.test_cases.length + 1,
           ...data.test_case,
+          id: data.test_case.id || (session.value.test_cases.length + 1),
           created_at: data.test_case.created_at || new Date().toISOString(),
         }
 

@@ -24,11 +24,19 @@ watch(
     } else {
       document.removeEventListener('paste', handlePaste)
     }
-  }
+  },
 )
 
 const handlePaste = (event) => {
-  emit('paste', event)
+  const items = (event.clipboardData || event.originalEvent.clipboardData).items
+  for (const item of items) {
+    if (item.type.indexOf('image') === 0) {
+      const blob = item.getAsFile()
+      emit('paste', blob)
+      event.preventDefault() // Prevent default paste behavior
+      break
+    }
+  }
 }
 
 const handleClose = () => {

@@ -1,4 +1,5 @@
 <script setup>
+import { ref, watch, nextTick } from 'vue'
 import {
   Tickets as TicketsIcon,
   Upload as UploadIcon,
@@ -17,6 +18,35 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue', 'upload-ocr'])
+
+const textareaRef = ref(null)
+
+watch(
+  () => props.modelValue,
+  async () => {
+    if (!props.ocrUploading) return // Only scroll during auto-updates if desired? Or always?
+    // User said "adding new content", usually implies the streaming case.
+    // But if user types manually, scrolling to bottom might be annoying.
+    // However, this component doesn't know *who* updated it easily.
+    // But `ocrUploading` is true during streaming. So we can use that as a hint/guard if we want to ONLY scroll during streaming.
+    // User said "when adding new content", implies streaming.
+    // If I just watch modelValue, typing at the top might jump to bottom?
+    // Let's assume we should scroll if we are in "uploading/generating" state.
+    // But `ocrUploading` becomes false when done.
+    // Let's just scroll always for now, or check if the change was an append?
+    // Safer: scroll if `ocrUploading` is true.
+
+    // Actually, checking `ocrUploading` is a good heuristic.
+    if (props.ocrUploading) {
+      await nextTick()
+      const textarea =
+        textareaRef.value?.textarea || textareaRef.value?.$el?.querySelector('textarea')
+      if (textarea) {
+        textarea.scrollTop = textarea.scrollHeight
+      }
+    }
+  },
+)
 </script>
 
 <template>
@@ -46,12 +76,13 @@ const emit = defineEmits(['update:modelValue', 'upload-ocr'])
     </div>
     <div class="p-4">
       <el-input
+        ref="textareaRef"
         type="textarea"
         :model-value="modelValue"
         @update:model-value="$emit('update:modelValue', $event)"
-        :rows="3"
+        :rows="12"
         placeholder="Describe the problem requirements and constraints..."
-        class="!border-none !shadow-none"
+        class="!border-none !shadow-none description-textarea"
       />
     </div>
   </div>

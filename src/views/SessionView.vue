@@ -16,13 +16,11 @@ import {
 // Async Components
 import { defineAsyncComponent } from 'vue'
 
-const CodeBlock = defineAsyncComponent(() => import('@/components/session/CodeBlock.vue'))
-const ProblemDescription = defineAsyncComponent(
-  () => import('@/components/session/ProblemDescription.vue'),
-)
-const OCRDialog = defineAsyncComponent(() => import('@/components/session/OCRDialog.vue'))
-const ControlPanel = defineAsyncComponent(() => import('@/components/session/ControlPanel.vue'))
-const TestCasesList = defineAsyncComponent(() => import('@/components/session/TestCasesList.vue'))
+import CodeBlock from '@/components/session/CodeBlock.vue'
+import ProblemDescription from '@/components/session/ProblemDescription.vue'
+import OCRDialog from '@/components/session/OCRDialog.vue'
+import ControlPanel from '@/components/session/ControlPanel.vue'
+import TestCasesList from '@/components/session/TestCasesList.vue'
 
 // Composables
 import { useSession } from '@/composables/useSession'
@@ -97,7 +95,11 @@ const checkerOptions = [
     label: 'casencmp',
     description: 'Many int64s checker with testcase-support',
   },
-  { value: 'casewcmp', label: 'casewcmp', description: 'Tokens checker with testcase-support' },
+  {
+    value: 'casewcmp',
+    label: 'casewcmp',
+    description: 'Tokens checker with testcase-support',
+  },
   {
     value: 'dcmp',
     label: 'dcmp',

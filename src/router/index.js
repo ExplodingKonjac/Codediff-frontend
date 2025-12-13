@@ -67,17 +67,7 @@ router.beforeEach((to, from, next) => {
 
 // 初始化认证状态
 router.isReady().then(async () => {
-  const authStore = useAuthStore()
-  
-  // 检查本地存储的 token
-  if (localStorage.getItem('token') && !authStore.user) {
-    try {
-      await authStore.fetchUserProfile()
-    } catch (error) {
-      console.error('Failed to fetch user profile on init:', error)
-      authStore.logout()
-    }
-  }
+  // Authentication check is handled in App.vue
 })
 
 export default router

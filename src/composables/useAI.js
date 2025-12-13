@@ -4,8 +4,6 @@ import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 
 export function useAI(session, sessionId, markUnsaved) {
-  const authStore = useAuthStore()
-  
   const aiStreaming = ref({
     generator: { loading: false, content: '', complete: false },
     standard: { loading: false, content: '', complete: false },
@@ -25,23 +23,20 @@ export function useAI(session, sessionId, markUnsaved) {
     aiStreaming.value[type] = { loading: true, content: '', complete: false }
 
     try {
-      const token = authStore.token
-      if (!token) throw new Error('Authentication required')
-
       let sseUrl = new URL(`${import.meta.env.VITE_API_URL}/ai/stream-generate`)
       sseUrl.searchParams.set('type', type)
       sseUrl.searchParams.set('session_id', sessionId.value)
 
       aiSSEClient[type] = new EventSourcePolyfill(sseUrl.toString(), {
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        withCredentials: true,
         heartbeatTimeout: 30000,
         connectionTimeout: 10000,
       })
 
-      aiSSEClient[type].addEventListener('code_chunk', (event) => {
+      aiSSEClient[type].addEventListener('chunk', (event) => {
         try {
           const data = JSON.parse(event.data)
           aiStreaming.value[type].content += data.content

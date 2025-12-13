@@ -1,10 +1,7 @@
 <script setup>
 import { computed, h } from 'vue'
 import MonacoEditor from 'vue-monaco'
-import {
-  MagicStick as MagicStickIcon,
-  Loading as LoadingIcon,
-} from '@element-plus/icons-vue'
+import { MagicStick as MagicStickIcon, Loading as LoadingIcon } from '@element-plus/icons-vue'
 
 MonacoEditor.render = () => h('div')
 
@@ -40,7 +37,13 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['update:modelValue', 'editor-mount', 'change', 'generate', 'stop-generate'])
+const emit = defineEmits([
+  'update:modelValue',
+  'editor-mount',
+  'change',
+  'generate',
+  'stop-generate',
+])
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', versions: ['c++11', 'c++14', 'c++17', 'c++20'] },
@@ -91,7 +94,7 @@ const handleChange = (value) => {
         <el-icon size="18"><component :is="icon" /></el-icon>
         <span>{{ title }}</span>
       </div>
-      
+
       <div class="flex items-center gap-3">
         <!-- Language Selector -->
         <div class="flex items-center gap-2">
@@ -106,7 +109,8 @@ const handleChange = (value) => {
           </el-select>
           <el-select v-model="currentVersion" size="small" class="!w-24">
             <el-option
-              v-for="version in languageOptions.find((l) => l.value === currentLanguage)?.versions || []"
+              v-for="version in languageOptions.find((l) => l.value === currentLanguage)
+                ?.versions || []"
               :key="version"
               :label="version.toUpperCase()"
               :value="version"
@@ -160,20 +164,7 @@ const handleChange = (value) => {
 </template>
 
 <style scoped>
-:deep(.el-select__wrapper) {
-  overflow: visible !important;
-}
-
-:deep(.el-select-dropdown__item) {
-  white-space: nowrap !important;
-  overflow: visible !important;
-}
-
-:deep(.el-select-dropdown) {
-  z-index: 9999 !important;
-}
-
-:deep(.el-select-dropdown__item:hover) {
-  background-color: #f3f4f6 !important;
+:deep(.suggest-widget) {
+  visibility: hidden !important;
 }
 </style>

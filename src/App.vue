@@ -6,11 +6,6 @@ import { useAuthStore } from '@/stores/auth'
 const authStore = useAuthStore()
 
 onMounted(() => {
-  // 初始化时尝试获取用户信息
-  if (localStorage.getItem('token')) {
-    authStore.fetchUserProfile()
-  }
-
   // 监听创建新会话事件
   window.addEventListener('create-session', () => {
     if (authStore.isAuthenticated) {
