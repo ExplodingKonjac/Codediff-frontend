@@ -86,7 +86,7 @@ const rules = {
     { required: true, message: 'Password is required', trigger: 'blur' },
     { min: 6, message: 'Password must be at least 6 characters', trigger: 'blur' },
     {
-      pattern: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/,
+      pattern: /^(?=.*[A-Za-z])(?=.*\d)/,
       message: 'Password must contain at least one letter and one number',
       trigger: 'blur',
     },
@@ -164,15 +164,15 @@ const strengthMeter = computed(() => {
   if (/[^A-Za-z0-9]/.test(password)) strength += 1
 
   return {
-    score: strength,
+    percentage: strength * 25,
     color:
       strength <= 1
-        ? 'bg-red-500'
+        ? '#f56c6c' // weak (red)
         : strength <= 2
-          ? 'bg-yellow-500'
+          ? '#e6a23c' // medium (yellow)
           : strength <= 3
-            ? 'bg-orange-500'
-            : 'bg-green-500',
+            ? '#409eff' // strong (blue)
+            : '#67c23a', // very strong (green)
     text:
       strength <= 1 ? 'Weak' : strength <= 2 ? 'Medium' : strength <= 3 ? 'Strong' : 'Very Strong',
   }
@@ -277,20 +277,20 @@ const strengthMeter = computed(() => {
               show-password
               @keyup.enter="handleSubmit"
             />
-            <div v-if="form.password" class="mt-2">
+            <div v-if="form.password" class="mt-2 w-full">
               <div class="flex justify-between text-xs mb-1">
                 <span>Password Strength:</span>
                 <span :class="strengthMeter.color" class="font-medium">{{
                   strengthMeter.text
                 }}</span>
               </div>
-              <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  class="h-full rounded-full transition-all duration-300"
-                  :class="strengthMeter.color"
-                  :style="{ width: strengthMeter.score * 25 + '%' }"
-                ></div>
-              </div>
+              <el-progress
+                :percentage="strengthMeter.percentage"
+                :color="strengthMeter.color"
+                :show-text="false"
+                :stroke-width="10"
+                class="w-full"
+              />
               <p class="text-xs text-gray-400 mt-1">
                 Must contain at least 6 characters, including letters and numbers
               </p>
