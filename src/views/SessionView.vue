@@ -273,8 +273,11 @@ onUnmounted(() => {
           <el-icon size="20"><ArrowLeftBoldIcon /></el-icon>
         </el-button>
         <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
-          <el-icon class="text-blue-500 text-3xl"><DocumentIcon /></el-icon>
-          <span>{{ session?.title || 'Loading session...' }}</span>
+          <span
+            class="truncate max-w-[200px] sm:max-w-[400px] md:max-w-[600px]"
+            :title="session?.title"
+            >{{ session?.title || 'Loading session...' }}</span
+          >
         </h1>
       </div>
       <div class="flex items-center gap-3">
@@ -338,7 +341,7 @@ onUnmounted(() => {
           :ai-loading="aiStreaming.generator.loading"
           @editor-mount="onGenEditorMounted"
           @change="markUnsaved"
-          @generate="generateCodeStreaming('generator')"
+          @generate="(saveSession(), generateCodeStreaming('generator'))"
           @stop-generate="stopAIGeneration('generator')"
           @update:modelValue="markUnsaved"
         />
@@ -357,7 +360,7 @@ onUnmounted(() => {
           :ai-loading="aiStreaming.standard.loading"
           @editor-mount="onStdEditorMounted"
           @change="markUnsaved"
-          @generate="generateCodeStreaming('standard')"
+          @generate="(saveSession(), generateCodeStreaming('standard'))"
           @stop-generate="stopAIGeneration('standard')"
           @update:modelValue="markUnsaved"
         />

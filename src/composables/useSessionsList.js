@@ -7,7 +7,7 @@ import { ElMessage } from 'element-plus'
 export function useSessionsList() {
   const router = useRouter()
   const authStore = useAuthStore()
-  
+
   const sessions = ref([])
   const loading = ref(true)
 
@@ -77,11 +77,11 @@ export function useSessionsList() {
     fetchSessions()
   }
 
-  const createNewSession = async () => {
+  const createNewSession = async (customTitle = null) => {
     try {
       loading.value = true
       const defaultSessionData = {
-        title: `New Session ${sessions.value.length + 1}`,
+        title: customTitle || `New Session ${sessions.value.length + 1}`,
         description: '',
         user_code: {
           lang: 'cpp',
@@ -113,7 +113,7 @@ export function useSessionsList() {
     } catch (error) {
       console.error('Create session error:', error)
       let errorMessage = 'Failed to create session'
-      
+
       if (error.response) {
         if (error.response.status === 401) {
           errorMessage = 'Authentication required.'
@@ -129,7 +129,7 @@ export function useSessionsList() {
       } else {
         errorMessage = error.message || 'Unknown error'
       }
-      
+
       ElMessage.error(errorMessage)
     } finally {
       loading.value = false

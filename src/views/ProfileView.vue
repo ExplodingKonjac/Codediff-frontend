@@ -32,8 +32,37 @@ const showAIDialog = ref(false)
 // ===== 新增：对话框数据 =====
 const emailForm = ref({
   newEmail: '',
+  verificationCode: '',
   password: '',
 })
+
+// 验证码倒计时
+const countdown = ref(0)
+let timer = null
+
+const handleSendCode = async () => {
+  if (!emailForm.value.newEmail) {
+    ElMessage.warning('Please enter new email address first')
+    return
+  }
+
+  // 简单验证邮箱格式
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailForm.value.newEmail)) {
+    ElMessage.warning('Please enter a valid email address')
+    return
+  }
+
+  const success = await authStore.sendVerificationCode(emailForm.value.newEmail)
+  if (success) {
+    countdown.value = 60
+    timer = setInterval(() => {
+      countdown.value--
+      if (countdown.value <= 0) {
+        clearInterval(timer)
+      }
+    }, 1000)
+  }
+}
 
 const passwordForm = ref({
   currentPassword: '',
@@ -82,6 +111,7 @@ const updateEmail = async () => {
     // 更新邮箱
     const updates = {
       email: emailForm.value.newEmail.trim(),
+      verification_code: emailForm.value.verificationCode.trim(),
       password: emailForm.value.password.trim(),
     }
 
@@ -92,7 +122,10 @@ const updateEmail = async () => {
 
     ElMessage.success('Email updated successfully')
     showEmailDialog.value = false
-    emailForm.value = { newEmail: '', password: '' }
+    showEmailDialog.value = false
+    emailForm.value = { newEmail: '', verificationCode: '', password: '' }
+    clearInterval(timer)
+    countdown.value = 0
   } catch (error) {
     ElMessage.error(`Failed to update email: ${error.message}`)
   } finally {
@@ -171,7 +204,9 @@ const updateAIConfig = async () => {
 // ===== 新增：对话框关闭处理 =====
 const closeEmailDialog = () => {
   showEmailDialog.value = false
-  emailForm.value = { newEmail: profile.value.email, password: '' }
+  emailForm.value = { newEmail: profile.value.email, verificationCode: '', password: '' }
+  clearInterval(timer)
+  countdown.value = 0
 }
 
 const closePasswordDialog = () => {
@@ -319,6 +354,25 @@ onMounted(() => {
           type="email"
           required
         />
+      </el-form-item>
+
+      <el-form-item label="Verification Code" prop="verificationCode">
+        <div class="flex gap-2 w-full">
+          <el-input
+            v-model="emailForm.verificationCode"
+            placeholder="6-digit code"
+            maxlength="6"
+            class="flex-1"
+          />
+          <el-button
+            type="primary"
+            :disabled="countdown > 0 || !emailForm.newEmail"
+            @click="handleSendCode"
+            class="w-32"
+          >
+            {{ countdown > 0 ? `${countdown}s` : 'Send Code' }}
+          </el-button>
+        </div>
       </el-form-item>
 
       <el-form-item label="Current Password" prop="password">

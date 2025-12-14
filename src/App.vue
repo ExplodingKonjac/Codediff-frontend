@@ -21,7 +21,7 @@ onMounted(() => {
 
 <template>
   <Header />
-  <main class="pt-[var(--header-height)]">
+  <main class="pt-[calc(var(--header-height)/2)]">
     <router-view />
   </main>
 </template>

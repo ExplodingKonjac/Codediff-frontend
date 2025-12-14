@@ -102,113 +102,6 @@ const statusConfig = computed(() => {
   return configs[status.split(' ').at(-1)] || configs['PENDING']
 })
 
-// ===== 动态截取功能实现 =====
-const headerRef = ref(null)
-const titleRef = ref(null)
-const truncatedTitle = ref('')
-
-// 计算截取长度
-const calculateTruncatedTitle = () => {
-  if (!titleRef.value || !props.testcase.input) return
-
-  const titleElement = titleRef.value
-  const parentWidth = titleElement.parentElement.clientWidth
-
-  // 预留空间给其他元素 (图标、ID、时间等)
-  const reservedSpace = 50 // px
-  const availableWidth = parentWidth - reservedSpace
-
-  // 使用临时元素测量文本宽度
-  const tempElement = document.createElement('span')
-  tempElement.style.visibility = 'hidden'
-  tempElement.style.position = 'absolute'
-  tempElement.style.whiteSpace = 'nowrap'
-  tempElement.style.fontSize = '1.125rem' // lg 对应的字体大小
-  tempElement.style.fontFamily = 'inherit'
-  tempElement.style.fontWeight = '500' // font-medium
-  tempElement.innerHTML = props.testcase.input
-  document.body.appendChild(tempElement)
-
-  const fullTextWidth = tempElement.offsetWidth
-  document.body.removeChild(tempElement)
-
-  // 如果完整文本宽度小于可用宽度，显示完整文本
-  if (fullTextWidth <= availableWidth) {
-    truncatedTitle.value = props.testcase.input
-    return
-  }
-
-  // 否则计算最大可显示字符数
-  const fullText = props.testcase.input
-  let maxChars = Math.floor(fullText.length * (availableWidth / fullTextWidth))
-
-  // 二分查找最合适的字符数
-  let left = 0
-  let right = maxChars
-  let bestLength = 0
-
-  while (left <= right) {
-    const mid = Math.floor((left + right) / 2)
-    const testText = fullText.substring(0, mid) + '...'
-
-    const testElement = document.createElement('span')
-    testElement.style.visibility = 'hidden'
-    testElement.style.position = 'absolute'
-    testElement.style.whiteSpace = 'nowrap'
-    testElement.style.fontSize = '1.125rem'
-    testElement.style.fontFamily = 'inherit'
-    testElement.style.fontWeight = '500'
-    testElement.innerHTML = testText
-    document.body.appendChild(testElement)
-
-    const testWidth = testElement.offsetWidth
-    document.body.removeChild(testElement)
-
-    if (testWidth <= availableWidth) {
-      bestLength = mid
-      left = mid + 1
-    } else {
-      right = mid - 1
-    }
-  }
-
-  truncatedTitle.value = bestLength > 0 ? fullText.substring(0, bestLength) + '...' : '...'
-}
-
-// 使用 ResizeObserver 监听容器大小变化
-const resizeObserver = ref(null)
-
-onMounted(() => {
-  // 初始计算
-  calculateTruncatedTitle()
-
-  // 创建 ResizeObserver
-  resizeObserver.value = new ResizeObserver(() => {
-    calculateTruncatedTitle()
-  })
-
-  // 监听头部容器
-  if (headerRef.value) {
-    resizeObserver.value.observe(headerRef.value)
-  }
-})
-
-onUnmounted(() => {
-  if (resizeObserver.value) {
-    resizeObserver.value.disconnect()
-  }
-})
-
-// 当输入数据变化时重新计算
-watch(
-  () => props.testcase.input,
-  () => {
-    nextTick(() => {
-      calculateTruncatedTitle()
-    })
-  },
-)
-
 const toggleExpand = () => {
   expanded.value = !expanded.value
   emit('toggle', expanded.value)
@@ -232,16 +125,15 @@ const handleContentClick = (event) => {
       @click="toggleExpand"
     >
       <div class="flex justify-between items-center">
-        <div class="flex items-center gap-3 flex-1">
+        <div class="flex items-center gap-3 flex-1 min-w-0">
           <div class="flex-shrink-0">
             <el-avatar :size="32" :class="`${statusConfig.bgColor} ${statusConfig.color}`">
               <el-icon size="20"><component :is="statusConfig.icon" /></el-icon>
             </el-avatar>
           </div>
           <div class="min-w-0 flex-1">
-            <!-- 动态截取的标题 -->
-            <div ref="titleRef" class="font-medium text-gray-800 truncate text-lg">
-              {{ truncatedTitle || 'No input data' }}
+            <div class="font-medium text-gray-800 truncate text-lg" :title="testcase.input">
+              {{ testcase.input || 'No input data' }}
             </div>
             <div class="flex items-center gap-2 mt-1 text-sm">
               <span class="font-medium font-mono" :class="statusConfig.color">{{

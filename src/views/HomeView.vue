@@ -1,8 +1,9 @@
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import SessionCard from '@/components/SessionCard.vue'
+import { ElMessage } from 'element-plus'
 import {
   Plus as PlusIcon,
   RefreshRight as RefreshRightIcon,
@@ -38,6 +39,31 @@ onMounted(() => {
     router.push('/login')
   }
 })
+
+// Create Session Dialog Logic
+const createSessionDialogVisible = ref(false)
+const newSessionTitle = ref('')
+const creating = ref(false)
+
+const openCreateDialog = () => {
+  newSessionTitle.value = ''
+  createSessionDialogVisible.value = true
+}
+
+const handleCreateSession = async () => {
+  if (!newSessionTitle.value.trim()) {
+    ElMessage.warning('Please enter a session title')
+    return
+  }
+
+  try {
+    creating.value = true
+    await createNewSession(newSessionTitle.value)
+    createSessionDialogVisible.value = false
+  } finally {
+    creating.value = false
+  }
+}
 </script>
 
 <template>
@@ -85,7 +111,7 @@ onMounted(() => {
         <!-- 按钮区域 -->
         <el-button
           type="primary"
-          @click="createNewSession"
+          @click="openCreateDialog"
           class="flex items-center gap-2 h-10 px-4"
         >
           <el-icon class="text-xl"><PlusIcon /></el-icon>
@@ -116,7 +142,7 @@ onMounted(() => {
     >
       <el-icon class="text-gray-400 text-5xl mb-6"><DocumentRemoveIcon /></el-icon>
       <p class="text-xl text-gray-600 mb-4">No sessions created yet</p>
-      <el-button type="primary" size="large" @click="createNewSession" class="px-8 py-4">
+      <el-button type="primary" size="large" @click="openCreateDialog" class="px-8 py-4">
         <el-icon class="mr-2"><PlusIcon /></el-icon>
         Create Your First Session
       </el-button>
@@ -157,6 +183,30 @@ onMounted(() => {
         class="pagination-control"
       />
     </div>
+
+    <!-- Create Session Dialog -->
+    <el-dialog
+      v-model="createSessionDialogVisible"
+      title="Create New Session"
+      width="500px"
+      align-center
+    >
+      <div class="py-4">
+        <el-form @submit.prevent="handleCreateSession">
+          <el-form-item label="Session Title" required>
+            <el-input v-model="newSessionTitle" placeholder="e.g. Codeforces 1234A" autofocus />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="createSessionDialogVisible = false">Cancel</el-button>
+          <el-button type="primary" :loading="creating" @click="handleCreateSession">
+            Create
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 

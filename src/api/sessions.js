@@ -16,26 +16,26 @@ export const createSession = (sessionData) => {
     user_code: {
       lang: String(sessionData.user_code.lang),
       std: String(sessionData.user_code.std),
-      content: String(sessionData.user_code.content || '')
+      content: String(sessionData.user_code.content || ''),
     },
     std_code: {
       lang: String(sessionData.std_code.lang),
       std: String(sessionData.std_code.std),
-      content: String(sessionData.std_code.content || '')
-    }
+      content: String(sessionData.std_code.content || ''),
+    },
   }
-  
+
   // 可选字段
   if (sessionData.gen_code && sessionData.gen_code.content) {
     payload.gen_code = {
       lang: String(sessionData.gen_code.lang),
       std: String(sessionData.gen_code.std),
-      content: String(sessionData.gen_code.content)
+      content: String(sessionData.gen_code.content),
     }
   }
-  
+
   console.log('Creating session with payload:', payload)
-  
+
   return api.post('/sessions', payload)
 }
 

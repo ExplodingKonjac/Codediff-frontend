@@ -117,7 +117,9 @@ const handleDelete = async (event) => {
     <div class="p-6">
       <!-- 标题和操作按钮行 -->
       <div class="flex justify-between items-start mb-4">
-        <h3 class="text-xl font-bold text-gray-800">{{ session.title }}</h3>
+        <h3 class="text-xl font-bold text-gray-800 truncate pr-4" :title="session.title">
+          {{ session.title }}
+        </h3>
         <div class="flex gap-2">
           <el-button
             type="warning"
