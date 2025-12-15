@@ -181,7 +181,7 @@ const strengthMeter = computed(() => {
 
 <template>
   <div
-    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 pt-[var(--header-height)] -mt-[var(--header-height)]"
+    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 pt-[var(--header-height)] -mt-[var(--header-height)] -mb-[calc(var(--header-height)/2)] pb-[calc(var(--header-height)/2)]"
   >
     <div class="w-full max-w-md">
       <div class="mb-6 flex items-center gap-3 cursor-pointer" @click="handleBack">
