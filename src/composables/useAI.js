@@ -8,7 +8,7 @@ export function useAI(session, sessionId, markUnsaved) {
     generator: { loading: false, content: '', complete: false },
     standard: { loading: false, content: '', complete: false },
   })
-  
+
   const aiSSEClient = {
     generator: null,
     standard: null,
@@ -40,27 +40,33 @@ export function useAI(session, sessionId, markUnsaved) {
         try {
           const data = JSON.parse(event.data)
           aiStreaming.value[type].content += data.content
-          if (editor) {
-             toRaw(editor).setValue(aiStreaming.value[type].content)
+
+          // Update session incrementally to trigger watchers in UI
+          const key = type === 'generator' ? 'gen_code' : 'std_code'
+          if (!session.value[key]) {
+            session.value[key] = { lang: 'cpp', std: 'c++17', content: '' }
           }
+          session.value[key].content = aiStreaming.value[type].content
         } catch (e) {
           console.error(e)
         }
       })
 
       aiSSEClient[type].addEventListener('finish', () => {
-        ElMessage.success(`${type === 'generator' ? 'Generator' : 'Standard'} code generated successfully!`)
-        
+        ElMessage.success(
+          `${type === 'generator' ? 'Generator' : 'Standard'} code generated successfully!`,
+        )
+
         const key = type === 'generator' ? 'gen_code' : 'std_code'
         if (!session.value[key]) {
-             session.value[key] = { lang: 'cpp', std: 'c++17', content: '' }
+          session.value[key] = { lang: 'cpp', std: 'c++17', content: '' }
         }
         session.value[key].content = aiStreaming.value[type].content
         markUnsaved()
-        
+
         aiStreaming.value[type].loading = false
         aiStreaming.value[type].complete = true
-        
+
         if (aiSSEClient[type]) {
           aiSSEClient[type].close()
           aiSSEClient[type] = null
@@ -68,31 +74,30 @@ export function useAI(session, sessionId, markUnsaved) {
       })
 
       aiSSEClient[type].onerror = (error) => {
-         console.error('AI SSE error:', error)
-         ElMessage.error('AI Generation failed')
-         aiStreaming.value[type].loading = false
-         if (aiSSEClient[type]) {
-            aiSSEClient[type].close()
-            aiSSEClient[type] = null
-         }
+        console.error('AI SSE error:', error)
+        ElMessage.error('AI Generation failed')
+        aiStreaming.value[type].loading = false
+        if (aiSSEClient[type]) {
+          aiSSEClient[type].close()
+          aiSSEClient[type] = null
+        }
       }
-
     } catch (error) {
       console.error('AI Generation setup error:', error)
       ElMessage.error(`Failed to start AI generation: ${error.message}`)
       aiStreaming.value[type].loading = false
     }
   }
-  
+
   const cleanupAI = () => {
-      Object.values(aiSSEClient).forEach(client => {
-          if (client) client.close()
-      })
+    Object.values(aiSSEClient).forEach((client) => {
+      if (client) client.close()
+    })
   }
 
   return {
     aiStreaming,
     generateCodeStreaming,
-    cleanupAI
+    cleanupAI,
   }
 }

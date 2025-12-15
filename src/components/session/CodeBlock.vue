@@ -1,5 +1,5 @@
 <script setup>
-import { computed, h } from 'vue'
+import { computed, h, watch, shallowRef } from 'vue'
 import MonacoEditor from 'vue-monaco'
 import { MagicStick as MagicStickIcon, Loading as LoadingIcon } from '@element-plus/icons-vue'
 
@@ -53,7 +53,17 @@ const languageOptions = [
 const currentLanguage = computed({
   get: () => props.modelValue.lang || 'cpp',
   set: (value) => {
-    emit('update:modelValue', { ...props.modelValue, lang: value })
+    // Determine the valid versions for the selected language
+    const targetLang = languageOptions.find((opt) => opt.value === value)
+    const validVersions = targetLang ? targetLang.versions : []
+
+    // If current std is not valid for the new language, switch to the default (last available)
+    let newStd = props.modelValue.std
+    if (!validVersions.includes(newStd)) {
+      newStd = validVersions.length > 0 ? validVersions[validVersions.length - 1] : ''
+    }
+
+    emit('update:modelValue', { ...props.modelValue, lang: value, std: newStd })
   },
 })
 
@@ -78,12 +88,26 @@ const editorOptions = {
 }
 
 const handleEditorDidMount = (editor) => {
+  editorRef.value = editor
   emit('editor-mount', editor)
 }
 
 const handleChange = (value) => {
   emit('change', value)
 }
+
+// Auto-scroll to bottom during AI generation
+const editorRef = shallowRef(null)
+
+watch(
+  () => props.modelValue.content,
+  () => {
+    if (props.aiLoading && editorRef.value) {
+      const lineCount = editorRef.value.getModel().getLineCount()
+      editorRef.value.revealLine(lineCount)
+    }
+  },
+)
 </script>
 
 <template>
