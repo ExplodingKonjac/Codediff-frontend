@@ -128,9 +128,8 @@ const handleDelete = async (event) => {
             @click.stop="handleEditTitle"
             class="hover:bg-yellow-100 transition-colors"
             title="Edit title"
-          >
-            <el-icon size="16"><EditIcon /></el-icon>
-          </el-button>
+            :icon="EditIcon"
+          />
           <el-button
             type="danger"
             size="small"
@@ -138,9 +137,8 @@ const handleDelete = async (event) => {
             @click.stop="handleDelete"
             class="hover:bg-red-100 transition-colors"
             title="Delete session"
-          >
-            <el-icon size="16"><DeleteIcon /></el-icon>
-          </el-button>
+            :icon="DeleteIcon"
+          />
         </div>
       </div>
 

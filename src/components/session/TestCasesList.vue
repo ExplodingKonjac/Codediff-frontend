@@ -60,8 +60,13 @@ const emit = defineEmits(['retry', 'generate-first'])
       >
         <p class="text-red-600 whitespace-pre-wrap">{{ failureDetail }}</p>
       </div>
-      <el-button type="danger" size="medium" @click="$emit('retry')" class="mt-6 px-6 py-2">
-        <el-icon class="mr-1"><RefreshIcon /></el-icon>
+      <el-button
+        type="danger"
+        size="medium"
+        @click="$emit('retry')"
+        class="mt-6 px-6 py-2"
+        :icon="RefreshIcon"
+      >
         Try Again
       </el-button>
     </div>
@@ -89,8 +94,8 @@ const emit = defineEmits(['retry', 'generate-first'])
           size="medium"
           @click="$emit('generate-first')"
           class="mt-2 px-4 py-2"
+          :icon="RefreshIcon"
         >
-          <el-icon class="mr-1"><RefreshIcon /></el-icon>
           Generate First Test
         </el-button>
       </div>

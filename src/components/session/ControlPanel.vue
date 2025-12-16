@@ -36,13 +36,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits([
-  'update:maxTests',
-  'update:selectedChecker',
-  'start',
-  'stop',
-  'rerun',
-])
+const emit = defineEmits(['update:maxTests', 'update:selectedChecker', 'start', 'stop', 'rerun'])
 </script>
 
 <template>
@@ -110,8 +104,8 @@ const emit = defineEmits([
         @click="$emit('start')"
         :disabled="loading"
         class="flex-1 px-4 py-3 text-base font-medium shadow-md hover:shadow-lg transition-all"
+        :icon="RefreshIcon"
       >
-        <el-icon class="mr-1 text-lg"><RefreshIcon /></el-icon>
         <span>Continuous Diff</span>
       </el-button>
 
@@ -121,8 +115,8 @@ const emit = defineEmits([
         size="large"
         @click="$emit('stop')"
         class="flex-1 px-4 py-3 text-base font-medium shadow-md hover:shadow-lg transition-all"
+        :icon="CloseIcon"
       >
-        <el-icon class="mr-1 text-lg"><CloseIcon /></el-icon>
         <span>Stop Diff</span>
       </el-button>
 
@@ -132,8 +126,8 @@ const emit = defineEmits([
         @click="$emit('rerun')"
         :disabled="loading || !hasTestCases"
         class="flex-1 px-4 py-3 text-base font-medium shadow-md hover:shadow-lg transition-all"
+        :icon="VideoPlayIcon"
       >
-        <el-icon class="mr-1 text-lg"><VideoPlayIcon /></el-icon>
         <span>Rerun Tests</span>
       </el-button>
     </div>

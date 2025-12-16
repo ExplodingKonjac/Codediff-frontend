@@ -7,61 +7,73 @@ const routes = [
     path: '/',
     name: 'home',
     component: HomeView,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true },
   },
   {
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),
-    meta: { requiresGuest: true }
+    meta: { requiresGuest: true },
   },
   {
     path: '/register',
     name: 'register',
     component: () => import('@/views/RegisterView.vue'),
-    meta: { requiresGuest: true }
+    meta: { requiresGuest: true },
   },
   {
     path: '/sessions/:id',
     name: 'session',
     component: () => import('@/views/SessionView.vue'),
     meta: { requiresAuth: true },
-    props: true
+    props: true,
   },
   {
     path: '/profile',
     name: 'profile',
     component: () => import('@/views/ProfileView.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/admin',
+    name: 'admin',
+    component: () => import('@/views/AdminView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
-    component: () => import('@/views/NotFoundView.vue')
-  }
+    component: () => import('@/views/NotFoundView.vue'),
+  },
 ]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes
+  routes,
 })
 
 // 路由守卫
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
-  
+
   // 需要认证的路由
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'login', query: { redirect: to.fullPath } })
     return
   }
-  
+
+  // 需要管理员权限的路由
+  if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next({ name: 'home' })
+    return
+  }
+
   // 仅访客可访问的路由
   if (to.meta.requiresGuest && authStore.isAuthenticated) {
     next({ name: 'home' })
     return
   }
-  
+
   next()
 })
 

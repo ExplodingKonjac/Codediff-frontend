@@ -150,8 +150,8 @@ watch(
             @click="$emit('generate')"
             class="!h-8 !px-3 !text-sm !bg-white/20 hover:!bg-white/30 font-medium flex items-center gap-1"
             style="--el-button-text-color: white; --el-button-hover-text-color: white"
+            :icon="MagicStickIcon"
           >
-            <el-icon size="16" class="text-white"><MagicStickIcon /></el-icon>
             <span class="hidden md:inline">AI Generate</span>
           </el-button>
           <el-button
@@ -160,8 +160,8 @@ watch(
             @click="$emit('stop-generate')"
             class="!h-8 !px-3 !text-sm !bg-red-500/20 hover:!bg-red-500/30 font-medium text-white flex items-center gap-1"
             style="--el-button-text-color: white; --el-button-hover-text-color: white"
+            :icon="LoadingIcon"
           >
-            <el-icon size="16" class="text-white animate-spin"><LoadingIcon /></el-icon>
             <span class="hidden md:inline">Generating...</span>
           </el-button>
         </div>

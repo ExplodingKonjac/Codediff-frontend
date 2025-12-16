@@ -113,8 +113,8 @@ const handleCreateSession = async () => {
           type="primary"
           @click="openCreateDialog"
           class="flex items-center gap-2 h-10 px-4"
+          :icon="PlusIcon"
         >
-          <el-icon class="text-xl"><PlusIcon /></el-icon>
           <span>New Session</span>
         </el-button>
 
@@ -124,8 +124,8 @@ const handleCreateSession = async () => {
           :loading="loading"
           class="flex items-center gap-2 h-10 px-4"
           style="margin-left: 0"
+          :icon="RefreshRightIcon"
         >
-          <el-icon class="text-lg"><RefreshRightIcon /></el-icon>
           <span>Refresh</span>
         </el-button>
       </div>
@@ -142,8 +142,13 @@ const handleCreateSession = async () => {
     >
       <el-icon class="text-gray-400 text-5xl mb-6"><DocumentRemoveIcon /></el-icon>
       <p class="text-xl text-gray-600 mb-4">No sessions created yet</p>
-      <el-button type="primary" size="large" @click="openCreateDialog" class="px-8 py-4">
-        <el-icon class="mr-2"><PlusIcon /></el-icon>
+      <el-button
+        type="primary"
+        size="large"
+        @click="openCreateDialog"
+        class="px-8 py-4"
+        :icon="PlusIcon"
+      >
         Create Your First Session
       </el-button>
     </div>

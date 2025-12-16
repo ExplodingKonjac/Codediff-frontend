@@ -14,6 +14,7 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   SwitchButton as LogoutIcon,
+  Management as ManagementIcon,
 } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
@@ -100,6 +101,15 @@ const handleNewSession = () => {
               class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg py-1 z-10 border border-gray-100"
               @click.outside="dropdownVisible = false"
             >
+              <div
+                v-if="authStore.isAdmin"
+                class="flex items-center gap-3 px-4 py-2 hover:bg-blue-50 cursor-pointer"
+                @click="(router.push('/admin'), (dropdownVisible = false))"
+              >
+                <el-icon class="text-blue-500 text-lg"><ManagementIcon /></el-icon>
+                <span>Admin Panel</span>
+              </div>
+
               <div
                 class="flex items-center gap-3 px-4 py-2 hover:bg-blue-50 cursor-pointer"
                 @click="handleProfile"

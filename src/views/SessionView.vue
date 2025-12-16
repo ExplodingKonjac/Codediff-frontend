@@ -269,9 +269,8 @@ onUnmounted(() => {
           @click="router.push('/')"
           circle
           class="shadow-md hover:shadow-lg transition-shadow"
-        >
-          <el-icon size="20"><ArrowLeftBoldIcon /></el-icon>
-        </el-button>
+          :icon="ArrowLeftBoldIcon"
+        />
         <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
           <span
             class="truncate max-w-[200px] sm:max-w-[400px] md:max-w-[600px]"
@@ -287,8 +286,8 @@ onUnmounted(() => {
           @click="saveSession"
           :loading="loading"
           class="px-4 py-2"
+          :icon="EditIcon"
         >
-          <el-icon class="mr-1"><EditIcon /></el-icon>
           Save Changes
         </el-button>
 
@@ -296,8 +295,8 @@ onUnmounted(() => {
           type="primary"
           @click="editSessionTitle"
           class="hidden md:flex px-5 py-2 text-lg font-medium"
+          :icon="EditIcon"
         >
-          <el-icon class="mr-2 text-lg"><EditIcon /></el-icon>
           Edit Title
         </el-button>
 
@@ -305,8 +304,8 @@ onUnmounted(() => {
           type="danger"
           @click="deleteSessionConfirm"
           class="hidden md:flex px-5 py-2 text-lg font-medium"
+          :icon="DeleteIcon"
         >
-          <el-icon class="mr-2 text-lg"><DeleteIcon /></el-icon>
           Delete Session
         </el-button>
       </div>

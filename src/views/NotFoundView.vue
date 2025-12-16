@@ -26,13 +26,17 @@ const goHome = () => {
           size="large"
           @click="goHome"
           class="flex items-center gap-2 px-6 py-3"
+          :icon="HouseIcon"
         >
-          <el-icon size="20"><HouseIcon /></el-icon>
           <span>Go to Home</span>
         </el-button>
 
-        <el-button size="large" @click="router.back()" class="flex items-center gap-2 px-6 py-3">
-          <el-icon size="20"><ArrowLeftBoldIcon /></el-icon>
+        <el-button
+          size="large"
+          @click="router.back()"
+          class="flex items-center gap-2 px-6 py-3"
+          :icon="ArrowLeftBoldIcon"
+        >
           <span>Go Back</span>
         </el-button>
       </div>

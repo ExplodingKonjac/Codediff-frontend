@@ -68,7 +68,11 @@ body {
 }
 
 .el-input {
-  --el-input-border-radius: 8px !important;
+  --el-border-radius-base: 8px !important;
+}
+
+.el-select {
+  --el-border-radius-base: 8px !important;
 }
 
 /* 响应式调整 */
