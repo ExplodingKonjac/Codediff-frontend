@@ -2,8 +2,10 @@ import { ref } from 'vue'
 import { ocr as apiOcr } from '@/api/ai'
 import { ElMessage } from 'element-plus'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { useI18n } from 'vue-i18n'
 
 export function useOCR(session, markUnsaved) {
+  const { t } = useI18n()
   const ocrUploading = ref(false)
   const ocrDialogVisible = ref(false)
   const ocrImageFile = ref(null)
@@ -22,7 +24,7 @@ export function useOCR(session, markUnsaved) {
 
   const startOCR = async () => {
     if (!ocrImageFile.value) {
-      ElMessage.warning('Please select or paste an image first')
+      ElMessage.warning(t('ocr.selectImage'))
       return
     }
 
@@ -61,7 +63,7 @@ export function useOCR(session, markUnsaved) {
             const data = JSON.parse(msg.data)
             throw new Error(data.message)
           } else if (msg.event === 'finish') {
-            ElMessage.success('OCR processed successfully')
+            ElMessage.success(t('ocr.success'))
           }
         },
         onerror(err) {
@@ -82,7 +84,7 @@ export function useOCR(session, markUnsaved) {
       if (error.name === 'AbortError') return
 
       console.error('OCR error:', error)
-      ElMessage.error(`OCR failed: ${error.message || 'Unknown error'}`)
+      ElMessage.error(`${t('ocr.failed')}: ${error.message || 'Unknown error'}`)
     } finally {
       ocrUploading.value = false
       abortController.value = null

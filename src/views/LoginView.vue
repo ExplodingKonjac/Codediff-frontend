@@ -9,7 +9,9 @@ import {
   ArrowLeftBold as ArrowLeftBoldIcon,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const authStore = useAuthStore()
 const router = useRouter()
 const identifier = ref('')
@@ -19,7 +21,7 @@ const rememberMe = ref(true)
 
 const handleSubmit = async () => {
   if (!identifier.value.trim() || !password.value.trim()) {
-    ElMessage.warning('Please enter both username/email and password')
+    ElMessage.warning(t('auth.enterBothCredentials'))
     return
   }
 
@@ -46,7 +48,7 @@ const handleSubmit = async () => {
       router.push(redirectPath)
     }
   } catch (error) {
-    ElMessage.error(`Login failed: ${error.message}`)
+    ElMessage.error(`${t('auth.loginFailed')}: ${error.message}`)
   } finally {
     loading.value = false
   }
@@ -68,32 +70,32 @@ const handleBack = () => {
     <div class="w-full max-w-md">
       <div class="mb-6 flex items-center gap-3 cursor-pointer" @click="handleBack">
         <el-icon class="text-blue-600 text-xl"><ArrowLeftBoldIcon /></el-icon>
-        <div class="text-blue-600 font-medium">Back to Home</div>
+        <div class="text-blue-600 font-medium">{{ t('auth.backToHome') }}</div>
       </div>
 
       <el-card class="border border-gray-200 shadow-lg">
         <div class="text-center mb-6">
           <img src="/logo.png" alt="CodeDiff Logo" class="h-16 w-auto mx-auto mb-4" />
-          <h1 class="text-2xl font-bold text-gray-800">Welcome to CodeDiff</h1>
-          <p class="text-gray-500 mt-1">Verify your code with ease</p>
+          <h1 class="text-2xl font-bold text-gray-800">{{ t('auth.welcomeTitle') }}</h1>
+          <p class="text-gray-500 mt-1">{{ t('auth.welcomeSubtitle') }}</p>
         </div>
 
         <el-form @submit.prevent="handleSubmit" label-position="top" class="space-y-4">
-          <el-form-item label="Username or Email">
+          <el-form-item :label="t('auth.usernameOrEmail')">
             <el-input
               v-model="identifier"
-              placeholder="Enter your username or email"
+              :placeholder="t('auth.enterUsernameOrEmail')"
               size="large"
               :prefix-icon="UserIcon"
               @keyup.enter="handleSubmit"
             />
           </el-form-item>
 
-          <el-form-item label="Password">
+          <el-form-item :label="t('auth.password')">
             <el-input
               v-model="password"
               type="password"
-              placeholder="Enter your password"
+              :placeholder="t('auth.enterPassword')"
               size="large"
               :prefix-icon="LockIcon"
               show-password
@@ -102,8 +104,8 @@ const handleBack = () => {
           </el-form-item>
 
           <div class="flex items-center justify-between mb-6">
-            <el-checkbox v-model="rememberMe">Remember me</el-checkbox>
-            <el-link type="primary" :underline="false">Forgot password?</el-link>
+            <el-checkbox v-model="rememberMe">{{ t('auth.rememberMe') }}</el-checkbox>
+            <el-link type="primary" :underline="false">{{ t('auth.forgotPassword') }}</el-link>
           </div>
 
           <el-button
@@ -113,28 +115,28 @@ const handleBack = () => {
             @click="handleSubmit"
             :loading="loading"
           >
-            Sign In
+            {{ t('auth.signIn') }}
           </el-button>
 
           <div class="text-center mt-4">
-            <span class="text-gray-500">Don't have an account?</span>
+            <span class="text-gray-500">{{ t('auth.noAccount') }}</span>
             <el-link
               type="primary"
               :underline="false"
               class="ml-1 cursor-pointer"
               @click="handleRegister"
             >
-              Sign up
+              {{ t('auth.signUp') }}
             </el-link>
           </div>
         </el-form>
 
         <div class="mt-6 pt-6 border-t border-gray-200">
           <p class="text-center text-sm text-gray-500">
-            By signing in, you agree to our
-            <el-link type="primary" :underline="false">Terms of Service</el-link>
-            and
-            <el-link type="primary" :underline="false">Privacy Policy</el-link>
+            {{ t('auth.agreeTo') }}
+            <el-link type="primary" :underline="false">{{ t('auth.terms') }}</el-link>
+            &
+            <el-link type="primary" :underline="false">{{ t('auth.privacy') }}</el-link>
           </p>
         </div>
       </el-card>

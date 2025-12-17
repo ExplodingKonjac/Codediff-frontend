@@ -2,8 +2,10 @@ import { ref, toRaw } from 'vue'
 import { EventSourcePolyfill } from 'event-source-polyfill'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { useI18n } from 'vue-i18n'
 
 export function useAI(session, sessionId, markUnsaved) {
+  const { t } = useI18n()
   const aiStreaming = ref({
     generator: { loading: false, content: '', complete: false },
     standard: { loading: false, content: '', complete: false },
@@ -16,7 +18,7 @@ export function useAI(session, sessionId, markUnsaved) {
 
   const generateCodeStreaming = async (type, editor) => {
     if (!session.value || !sessionId.value) {
-      ElMessage.warning('Session not loaded')
+      ElMessage.warning(t('ai.sessionNotLoaded'))
       return
     }
 
@@ -55,7 +57,7 @@ export function useAI(session, sessionId, markUnsaved) {
 
       aiSSEClient[type].addEventListener('finish', () => {
         ElMessage.success(
-          `${type === 'generator' ? 'Generator' : 'Standard'} code generated successfully!`,
+          `${type === 'generator' ? 'Generator' : 'Standard'} ${t('ai.generateSuccess')}`,
         )
 
         const key = type === 'generator' ? 'gen_code' : 'std_code'
@@ -76,7 +78,7 @@ export function useAI(session, sessionId, markUnsaved) {
 
       aiSSEClient[type].onerror = (error) => {
         console.error('AI SSE error:', error)
-        ElMessage.error('AI Generation failed')
+        ElMessage.error(t('ai.generateFailed'))
         aiStreaming.value[type].loading = false
         if (aiSSEClient[type]) {
           aiSSEClient[type].close()
@@ -85,7 +87,7 @@ export function useAI(session, sessionId, markUnsaved) {
       }
     } catch (error) {
       console.error('AI Generation setup error:', error)
-      ElMessage.error(`Failed to start AI generation: ${error.message}`)
+      ElMessage.error(`${t('ai.startFailed')}: ${error.message}`)
       aiStreaming.value[type].loading = false
     }
   }

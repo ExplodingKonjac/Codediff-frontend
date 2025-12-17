@@ -1,12 +1,14 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { getSessions, createSession } from '@/api/sessions'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 
 export function useSessionsList() {
   const router = useRouter()
   const authStore = useAuthStore()
+  const { t } = useI18n()
 
   const sessions = ref([])
   const loading = ref(true)
@@ -24,16 +26,16 @@ export function useSessionsList() {
     order: 'desc',
   })
 
-  const sortOptions = [
-    { label: 'Update time', value: 'updated_at' },
-    { label: 'Create time', value: 'created_at' },
-    { label: 'Title', value: 'title' },
-  ]
+  const sortOptions = computed(() => [
+    { label: t('home.sort.updated_at'), value: 'updated_at' },
+    { label: t('home.sort.created_at'), value: 'created_at' },
+    { label: t('home.sort.title'), value: 'title' },
+  ])
 
-  const sortOrderOptions = [
-    { label: 'Descending', value: 'desc' },
-    { label: 'Ascending', value: 'asc' },
-  ]
+  const sortOrderOptions = computed(() => [
+    { label: t('home.sort.desc'), value: 'desc' },
+    { label: t('home.sort.asc'), value: 'asc' },
+  ])
 
   // Actions
   const fetchSessions = async () => {
@@ -55,7 +57,7 @@ export function useSessionsList() {
       }
     } catch (error) {
       console.error('Failed to load sessions:', error)
-      ElMessage.error(`Failed to load sessions: ${error.message}`)
+      ElMessage.error(`${t('session.loadFailed')}: ${error.message}`)
     } finally {
       loading.value = false
     }
@@ -81,7 +83,7 @@ export function useSessionsList() {
     try {
       loading.value = true
       const defaultSessionData = {
-        title: customTitle || `New Session ${sessions.value.length + 1}`,
+        title: customTitle || `${t('session.newSessionDefault')} ${sessions.value.length + 1}`,
         description: '',
         user_code: {
           lang: 'cpp',
@@ -105,14 +107,14 @@ export function useSessionsList() {
       if (response.data && response.data.id) {
         const newSession = response.data
         sessions.value.unshift(newSession)
-        ElMessage.success('New session created successfully!')
+        ElMessage.success(t('session.createSuccess'))
         router.push(`/sessions/${newSession.id}`)
       } else {
         throw new Error('Invalid response from server')
       }
     } catch (error) {
       console.error('Create session error:', error)
-      let errorMessage = 'Failed to create session'
+      let errorMessage = t('common.error')
 
       if (error.response) {
         if (error.response.status === 401) {

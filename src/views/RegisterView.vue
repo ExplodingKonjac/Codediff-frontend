@@ -13,7 +13,9 @@ import {
   ArrowLeftBold as ArrowLeftIcon,
   Check as CheckIcon,
 } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const authStore = useAuthStore()
 const router = useRouter()
 const formRef = ref(null) // 表单引用
@@ -31,12 +33,12 @@ const countdown = ref(0) // 倒计时
 // 发送验证码
 const handleSendCode = async () => {
   if (!form.value.email) {
-    ElMessage.warning('Please enter your email first')
+    ElMessage.warning(t('auth.enterEmailFirst'))
     return
   }
   // 简单验证邮箱格式
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email)) {
-    ElMessage.warning('Please enter a valid email address')
+    ElMessage.warning(t('auth.enterValidEmail'))
     return
   }
 
@@ -56,7 +58,7 @@ const handleSendCode = async () => {
     } else {
       // 虽然 store 中已经有错误提示，但这能确保用户一定能看到反馈
       if (!document.querySelector('.el-message--error')) {
-        ElMessage.error('Failed to send verification code. Please check your email and try again.')
+        ElMessage.error(t('auth.codeSendFailed'))
       }
     }
   } finally {
@@ -64,42 +66,47 @@ const handleSendCode = async () => {
   }
 }
 
-const rules = {
+const rules = computed(() => ({
   username: [
-    { required: true, message: 'Username is required', trigger: 'blur' },
-    { min: 3, max: 20, message: 'Username must be between 3 and 20 characters', trigger: 'blur' },
+    { required: true, message: t('auth.validation.usernameRequired'), trigger: 'blur' },
+    {
+      min: 3,
+      max: 20,
+      message: t('auth.validation.usernameLength'),
+      trigger: 'blur',
+    },
     {
       pattern: /^[a-zA-Z0-9_]+$/,
-      message: 'Username can only contain letters, numbers, and underscores',
+      message: t('auth.validation.usernamePattern'),
       trigger: 'blur',
     },
   ],
   email: [
-    { required: true, message: 'Email is required', trigger: 'blur' },
-    { type: 'email', message: 'Please enter a valid email address', trigger: 'blur' },
+    { required: true, message: t('auth.validation.emailRequired'), trigger: 'blur' },
+    { type: 'email', message: t('auth.validation.emailInvalid'), trigger: 'blur' },
   ],
   verificationCode: [
-    { required: true, message: 'Verification code is required', trigger: 'blur' },
-    { len: 6, message: 'Code must be 6 digits', trigger: 'blur' },
+    { required: true, message: t('auth.validation.codeRequired'), trigger: 'blur' },
+    { len: 6, message: t('auth.validation.codeLength'), trigger: 'blur' },
   ],
   password: [
-    { required: true, message: 'Password is required', trigger: 'blur' },
-    { min: 6, message: 'Password must be at least 6 characters', trigger: 'blur' },
+    { required: true, message: t('auth.validation.passwordRequired'), trigger: 'blur' },
+    { min: 6, message: t('auth.validation.passwordLength'), trigger: 'blur' },
     {
       pattern: /^(?=.*[A-Za-z])(?=.*\d)/,
-      message: 'Password must contain at least one letter and one number',
+      message: t('auth.validation.passwordPattern'),
       trigger: 'blur',
     },
   ],
   confirmPassword: [
-    { required: true, message: 'Please confirm your password', trigger: 'blur' },
+    { required: true, message: t('auth.validation.confirmPasswordRequired'), trigger: 'blur' },
     { validator: validatePasswordMatch, trigger: 'blur' },
   ],
-}
+}))
 
 function validatePasswordMatch(rule, value, callback) {
   if (value !== form.value.password) {
-    callback(new Error('Passwords do not match'))
+    callback(new Error(t('auth.passwordMismatch')))
   } else {
     callback()
   }
@@ -117,7 +124,7 @@ const handleSubmit = async () => {
 
   // 简单的前端验证
   if (form.value.password !== form.value.confirmPassword) {
-    ElMessage.warning('Passwords do not match')
+    ElMessage.warning(t('auth.passwordMismatch'))
     return
   }
 
@@ -134,13 +141,13 @@ const handleSubmit = async () => {
     const success = await authStore.register(userData)
 
     if (success) {
-      ElMessage.success('Registration successful! Redirecting to login...')
+      ElMessage.success(t('auth.registerSuccess'))
       setTimeout(() => {
         router.push('/login')
       }, 1500)
     }
   } catch (error) {
-    ElMessage.error(`Registration failed: ${error.message}`)
+    ElMessage.error(`${t('auth.registerFailed')}: ${error.message}`)
   } finally {
     loading.value = false
   }
@@ -174,7 +181,13 @@ const strengthMeter = computed(() => {
             ? '#409eff' // strong (blue)
             : '#67c23a', // very strong (green)
     text:
-      strength <= 1 ? 'Weak' : strength <= 2 ? 'Medium' : strength <= 3 ? 'Strong' : 'Very Strong',
+      strength <= 1
+        ? t('common.weak')
+        : strength <= 2
+          ? t('common.medium')
+          : strength <= 3
+            ? t('common.strong')
+            : t('common.veryStrong'),
   }
 })
 </script>
@@ -186,14 +199,14 @@ const strengthMeter = computed(() => {
     <div class="w-full max-w-md">
       <div class="mb-6 flex items-center gap-3 cursor-pointer" @click="handleBack">
         <el-icon class="text-blue-600 text-xl"><ArrowLeftIcon /></el-icon>
-        <div class="text-blue-600 font-medium">Back to Home</div>
+        <div class="text-blue-600 font-medium">{{ t('auth.backToHome') }}</div>
       </div>
 
       <el-card class="border border-gray-200 shadow-lg">
         <div class="text-center mb-6">
           <img src="/logo.png" alt="CodeDiff Logo" class="h-16 w-auto mx-auto mb-4" />
-          <h1 class="text-2xl font-bold text-gray-800">Create Account</h1>
-          <p class="text-gray-500 mt-1">Join CodeDiff and start verifying your code</p>
+          <h1 class="text-2xl font-bold text-gray-800">{{ t('auth.createAccount') }}</h1>
+          <p class="text-gray-500 mt-1">{{ t('auth.joinSubtitle') }}</p>
         </div>
 
         <el-form
@@ -204,10 +217,10 @@ const strengthMeter = computed(() => {
           label-position="top"
           class="space-y-4"
         >
-          <el-form-item label="Username" prop="username">
+          <el-form-item :label="t('auth.username')" prop="username">
             <el-input
               v-model="form.username"
-              placeholder="Choose a username (3-20 characters)"
+              :placeholder="t('auth.chooseUsername')"
               size="large"
               :prefix-icon="UserIcon"
               @keyup.enter="handleSubmit"
@@ -218,13 +231,13 @@ const strengthMeter = computed(() => {
                 </el-icon>
               </template>
             </el-input>
-            <p class="text-xs text-gray-400 mt-1">Only letters, numbers, and underscores allowed</p>
+            <p class="text-xs text-gray-400 mt-1">{{ t('auth.usernameHint') }}</p>
           </el-form-item>
 
-          <el-form-item label="Email" prop="email">
+          <el-form-item :label="t('auth.email')" prop="email">
             <el-input
               v-model="form.email"
-              placeholder="Enter your email address"
+              :placeholder="t('auth.enterEmail')"
               size="large"
               :prefix-icon="MessageIcon"
               @keyup.enter="handleSubmit"
@@ -240,11 +253,11 @@ const strengthMeter = computed(() => {
             </el-input>
           </el-form-item>
 
-          <el-form-item label="Verification Code" prop="verificationCode">
-            <div class="flex gap-2">
+          <el-form-item :label="t('auth.verificationCode')" prop="verificationCode">
+            <div class="flex gap-2 w-full">
               <el-input
                 v-model="form.verificationCode"
-                placeholder="6-digit code"
+                :placeholder="t('auth.enterCode')"
                 size="large"
                 class="flex-1"
                 maxlength="6"
@@ -262,16 +275,16 @@ const strengthMeter = computed(() => {
                 @click="handleSendCode"
                 class="w-32"
               >
-                {{ countdown > 0 ? `${countdown}s` : 'Send Code' }}
+                {{ countdown > 0 ? `${countdown}s` : t('auth.sendCode') }}
               </el-button>
             </div>
           </el-form-item>
 
-          <el-form-item label="Password" prop="password">
+          <el-form-item :label="t('auth.password')" prop="password">
             <el-input
               v-model="form.password"
               type="password"
-              placeholder="Create a strong password"
+              :placeholder="t('auth.createStrongPassword')"
               size="large"
               :prefix-icon="LockIcon"
               show-password
@@ -279,7 +292,7 @@ const strengthMeter = computed(() => {
             />
             <div v-if="form.password" class="mt-2 w-full">
               <div class="flex justify-between text-xs mb-1">
-                <span>Password Strength:</span>
+                <span>{{ t('auth.passwordStrength') }}:</span>
                 <span :class="strengthMeter.color" class="font-medium">{{
                   strengthMeter.text
                 }}</span>
@@ -292,16 +305,16 @@ const strengthMeter = computed(() => {
                 class="w-full"
               />
               <p class="text-xs text-gray-400 mt-1">
-                Must contain at least 6 characters, including letters and numbers
+                {{ t('auth.passwordHint') }}
               </p>
             </div>
           </el-form-item>
 
-          <el-form-item label="Confirm Password" prop="confirmPassword">
+          <el-form-item :label="t('auth.confirmPassword')" prop="confirmPassword">
             <el-input
               v-model="form.confirmPassword"
               type="password"
-              placeholder="Confirm your password"
+              :placeholder="t('auth.confirmPasswordPlaceholder')"
               size="large"
               :prefix-icon="KeyIcon"
               show-password
@@ -321,9 +334,9 @@ const strengthMeter = computed(() => {
           <div class="mb-6">
             <el-checkbox checked disabled>
               <span class="text-gray-600"
-                >I agree to the
-                <el-link type="primary" :underline="false">Terms of Service</el-link> and
-                <el-link type="primary" :underline="false">Privacy Policy</el-link></span
+                >{{ t('auth.agreeCheckbox') }}
+                <el-link type="primary" :underline="false">{{ t('auth.terms') }}</el-link> &
+                <el-link type="primary" :underline="false">{{ t('auth.privacy') }}</el-link></span
               >
             </el-checkbox>
           </div>
@@ -335,18 +348,18 @@ const strengthMeter = computed(() => {
             @click="handleSubmit"
             :loading="loading"
           >
-            Create Account
+            {{ t('auth.createAccount') }}
           </el-button>
 
           <div class="text-center mt-4">
-            <span class="text-gray-500">Already have an account?</span>
+            <span class="text-gray-500">{{ t('auth.alreadyHaveAccount') }}</span>
             <el-link
               type="primary"
               :underline="false"
               class="ml-1 cursor-pointer"
               @click="handleLogin"
             >
-              Sign in
+              {{ t('auth.signIn') }}
             </el-link>
           </div>
         </el-form>

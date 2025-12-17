@@ -4,6 +4,9 @@ import {
   Close as CloseIcon,
   VideoPlay as VideoPlayIcon,
 } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   maxTests: {
@@ -43,7 +46,7 @@ const emit = defineEmits(['update:maxTests', 'update:selectedChecker', 'start', 
   <div class="action-buttons">
     <div class="mb-4">
       <div class="flex justify-between text-sm mb-1 font-medium">
-        <span>Current status: {{ currentStatus }}</span>
+        <span>{{ t('control.currentStatus') }} {{ currentStatus }}</span>
       </div>
     </div>
 
@@ -52,26 +55,30 @@ const emit = defineEmits(['update:maxTests', 'update:selectedChecker', 'start', 
       <div class="flex flex-col gap-3">
         <!-- Max Tests -->
         <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-          <label class="text-sm font-medium text-gray-700 min-w-[80px]">Max Tests</label>
+          <label class="text-sm font-medium text-gray-700 min-w-[80px]">{{
+            t('control.maxTests')
+          }}</label>
           <el-input-number
             :model-value="maxTests"
             @update:model-value="$emit('update:maxTests', $event)"
             :min="1"
             :max="1000"
-            placeholder="Max tests to generate"
+            :placeholder="t('control.maxTestsPlaceholder')"
             class="w-full sm:w-auto flex-1"
           />
-          <p class="text-xs text-gray-500 sm:text-right">Tests to generate (1-1000)</p>
+          <p class="text-xs text-gray-500 sm:text-right">{{ t('control.maxTestsHint') }}</p>
         </div>
 
         <!-- Checker Selector -->
         <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-          <label class="text-sm font-medium text-gray-700 min-w-[80px]">Checker</label>
+          <label class="text-sm font-medium text-gray-700 min-w-[80px]">{{
+            t('control.checker')
+          }}</label>
           <div class="w-full sm:w-auto flex-1">
             <el-select
               :model-value="selectedChecker"
               @update:model-value="$emit('update:selectedChecker', $event)"
-              placeholder="Select checker"
+              :placeholder="t('control.selectChecker')"
               class="w-full"
               :filterable="true"
             >
@@ -81,7 +88,11 @@ const emit = defineEmits(['update:maxTests', 'update:selectedChecker', 'start', 
                 :label="checker.label"
                 :value="checker.value"
               >
-                <el-popover trigger="hover" :content="checker.description" placement="right">
+                <el-popover
+                  trigger="hover"
+                  :content="t(`checker.desc.${checker.value}`)"
+                  placement="right"
+                >
                   <template #reference>
                     <div class="flex justify-between items-center">
                       {{ checker.label }}
@@ -91,7 +102,7 @@ const emit = defineEmits(['update:maxTests', 'update:selectedChecker', 'start', 
               </el-option>
             </el-select>
           </div>
-          <p class="text-xs text-gray-500 mt-1">Checker to judge outputs</p>
+          <p class="text-xs text-gray-500 mt-1">{{ t('control.checkerHint') }}</p>
         </div>
       </div>
     </div>
@@ -106,7 +117,7 @@ const emit = defineEmits(['update:maxTests', 'update:selectedChecker', 'start', 
         class="flex-1 px-4 py-3 text-base font-medium shadow-md hover:shadow-lg transition-all"
         :icon="RefreshIcon"
       >
-        <span>Continuous Diff</span>
+        <span>{{ t('control.continuousDiff') }}</span>
       </el-button>
 
       <el-button
@@ -117,7 +128,7 @@ const emit = defineEmits(['update:maxTests', 'update:selectedChecker', 'start', 
         class="flex-1 px-4 py-3 text-base font-medium shadow-md hover:shadow-lg transition-all"
         :icon="CloseIcon"
       >
-        <span>Stop Diff</span>
+        <span>{{ t('control.stopDiff') }}</span>
       </el-button>
 
       <el-button
@@ -128,7 +139,7 @@ const emit = defineEmits(['update:maxTests', 'update:selectedChecker', 'start', 
         class="flex-1 px-4 py-3 text-base font-medium shadow-md hover:shadow-lg transition-all"
         :icon="VideoPlayIcon"
       >
-        <span>Rerun Tests</span>
+        <span>{{ t('control.rerunTests') }}</span>
       </el-button>
     </div>
   </div>

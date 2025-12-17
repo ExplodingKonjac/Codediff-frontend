@@ -1,8 +1,11 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { getUserProfile } from '@/api/auth'
 import { ElMessage } from 'element-plus'
 import { User as UserIcon, Cpu as CpuIcon, Camera as CameraIcon } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 import BasicInfoCard from '@/components/profile/BasicInfoCard.vue'
 import SecurityCard from '@/components/profile/SecurityCard.vue'
@@ -35,23 +38,23 @@ const fetchProfile = async () => {
       ocr_model: response.data.ocr_model || '',
     }
   } catch (error) {
-    ElMessage.error(`Failed to load profile: ${error.message}`)
+    ElMessage.error(`${t('common.error')}: ${error.message}`)
   } finally {
     loading.value = false
   }
 }
 
-const aiHelperText = {
-  apiKey: 'Your API key for the AI service (e.g., OpenAI, Claude, etc.)',
-  apiUrl: 'Example: https://api.openai.com/v1/',
-  model: 'Example: gpt-4o, gpt-3.5-turbo, claude-3-sonnet',
-}
+const aiHelperText = computed(() => ({
+  apiKey: t('profile.aiApiKeyHelp'),
+  apiUrl: t('profile.aiApiUrlHelp'),
+  model: t('profile.aiModelHelp'),
+}))
 
-const ocrHelperText = {
-  apiKey: 'Your API key for the OCR service (e.g., Aliyun, Baidu, OpenAI Vision, etc.)',
-  apiUrl: 'Example: https://dashscope.aliyuncs.com/compatible-mode/v1',
-  model: 'Example: qwen-vl-max, gpt-4-vision-preview',
-}
+const ocrHelperText = computed(() => ({
+  apiKey: t('profile.ocrApiKeyHelp'),
+  apiUrl: t('profile.ocrApiUrlHelp'),
+  model: t('profile.ocrModelHelp'),
+}))
 
 onMounted(() => {
   fetchProfile()
@@ -63,7 +66,7 @@ onMounted(() => {
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
         <el-icon class="text-blue-500 text-2xl"><UserIcon /></el-icon>
-        <span>User Profile</span>
+        <span>{{ t('profile.title') }}</span>
       </h1>
     </div>
 
@@ -81,7 +84,7 @@ onMounted(() => {
 
         <!-- CODE AI Configuration -->
         <ServiceConfigCard
-          title="AI Configuration"
+          :title="t('profile.aiConfig')"
           :icon="CpuIcon"
           prefix="ai"
           :profile="profile"
@@ -91,7 +94,7 @@ onMounted(() => {
 
         <!-- OCR AI Configuration -->
         <ServiceConfigCard
-          title="OCR AI Configuration"
+          :title="t('profile.ocrConfig')"
           :icon="CameraIcon"
           prefix="ocr"
           :profile="profile"

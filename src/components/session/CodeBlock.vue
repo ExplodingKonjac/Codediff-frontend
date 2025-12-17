@@ -2,6 +2,9 @@
 import { computed, h, watch, shallowRef } from 'vue'
 import MonacoEditor from 'vue-monaco'
 import { MagicStick as MagicStickIcon, Loading as LoadingIcon } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 MonacoEditor.render = () => h('div')
 
@@ -122,7 +125,7 @@ watch(
       <div class="flex items-center gap-3">
         <!-- Language Selector -->
         <div class="flex items-center gap-2">
-          <span class="text-sm hidden md:inline">Language:</span>
+          <span class="text-sm hidden md:inline">{{ t('codeblock.language') }}</span>
           <el-select v-model="currentLanguage" size="small" class="!w-24">
             <el-option
               v-for="lang in languageOptions"
@@ -152,7 +155,7 @@ watch(
             style="--el-button-text-color: white; --el-button-hover-text-color: white"
             :icon="MagicStickIcon"
           >
-            <span class="hidden md:inline">AI Generate</span>
+            <span class="hidden md:inline">{{ t('codeblock.aiGenerate') }}</span>
           </el-button>
           <el-button
             v-else
@@ -162,7 +165,7 @@ watch(
             style="--el-button-text-color: white; --el-button-hover-text-color: white"
           >
             <el-icon class="animate-spin"><LoadingIcon /></el-icon>
-            <span class="hidden md:inline">Generating...</span>
+            <span class="hidden md:inline">{{ t('codeblock.generating') }}</span>
           </el-button>
         </div>
       </div>

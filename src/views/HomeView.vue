@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import SessionCard from '@/components/SessionCard.vue'
@@ -12,6 +12,9 @@ import {
 } from '@element-plus/icons-vue'
 
 import { useSessionsList } from '@/composables/useSessionsList'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -21,8 +24,6 @@ const {
   loading,
   pagination,
   sortConfig,
-  sortOptions,
-  sortOrderOptions,
   fetchSessions,
   handlePageChange,
   handlePageSizeChange,
@@ -43,6 +44,17 @@ onMounted(() => {
 // Create Session Dialog Logic
 const createSessionDialogVisible = ref(false)
 const newSessionTitle = ref('')
+const sortOptions = computed(() => [
+  { label: t('home.sort.id'), value: 'id' },
+  { label: t('home.sort.title'), value: 'title' },
+  { label: t('home.sort.created_at'), value: 'created_at' },
+  { label: t('home.sort.updated_at'), value: 'updated_at' },
+])
+
+const sortOrderOptions = computed(() => [
+  { label: t('home.order.desc'), value: 'desc' },
+  { label: t('home.order.asc'), value: 'asc' },
+])
 const creating = ref(false)
 
 const openCreateDialog = () => {
@@ -52,7 +64,7 @@ const openCreateDialog = () => {
 
 const handleCreateSession = async () => {
   if (!newSessionTitle.value.trim()) {
-    ElMessage.warning('Please enter a session title')
+    ElMessage.warning(t('home.enterTitle'))
     return
   }
 
@@ -69,7 +81,7 @@ const handleCreateSession = async () => {
 <template>
   <div class="container mx-auto px-4 py-8 max-w-6xl">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-      <h1 class="text-3xl font-bold text-gray-800">My Diff Sessions</h1>
+      <h1 class="text-3xl font-bold text-gray-800">{{ t('home.mySessions') }}</h1>
 
       <!-- ===== 重构：统一控制栏 ===== -->
       <div class="flex flex-col sm:flex-row gap-3 sm:items-center w-full sm:w-auto">
@@ -77,7 +89,9 @@ const handleCreateSession = async () => {
         <div class="h-10 flex items-center bg-white border border-gray-300 rounded-lg px-3">
           <el-space size="1em">
             <el-icon class="text-blue-500"><SortIcon /></el-icon>
-            <span class="text-gray-700 font-medium mr-2 whitespace-nowrap">Sort By:</span>
+            <span class="text-gray-700 font-medium mr-2 whitespace-nowrap">{{
+              t('home.sortBy')
+            }}</span>
             <el-select
               v-model="sortConfig.sort"
               @change="handleSortChange"
@@ -115,7 +129,7 @@ const handleCreateSession = async () => {
           class="flex items-center gap-2 h-10 px-4"
           :icon="PlusIcon"
         >
-          <span>New Session</span>
+          <span>{{ t('home.newSession') }}</span>
         </el-button>
 
         <el-button
@@ -126,7 +140,7 @@ const handleCreateSession = async () => {
           style="margin-left: 0"
           :icon="RefreshRightIcon"
         >
-          <span>Refresh</span>
+          <span>{{ t('home.refresh') }}</span>
         </el-button>
       </div>
     </div>
@@ -141,7 +155,7 @@ const handleCreateSession = async () => {
       class="flex flex-col items-center justify-center h-96 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300"
     >
       <el-icon class="text-gray-400 text-5xl mb-6"><DocumentRemoveIcon /></el-icon>
-      <p class="text-xl text-gray-600 mb-4">No sessions created yet</p>
+      <p class="text-xl text-gray-600 mb-4">{{ t('home.noSessions') }}</p>
       <el-button
         type="primary"
         size="large"
@@ -149,7 +163,7 @@ const handleCreateSession = async () => {
         class="px-8 py-4"
         :icon="PlusIcon"
       >
-        Create Your First Session
+        {{ t('home.createFirst') }}
       </el-button>
     </div>
 
@@ -192,22 +206,24 @@ const handleCreateSession = async () => {
     <!-- Create Session Dialog -->
     <el-dialog
       v-model="createSessionDialogVisible"
-      title="Create New Session"
+      :title="t('home.createDialogTitle')"
       width="500px"
       align-center
     >
       <div class="py-4">
         <el-form @submit.prevent="handleCreateSession">
-          <el-form-item label="Session Title" required>
-            <el-input v-model="newSessionTitle" placeholder="e.g. Codeforces 1234A" autofocus />
+          <el-form-item :label="t('home.sessionTitle')" required>
+            <el-input v-model="newSessionTitle" :placeholder="t('home.enterTitle')" autofocus />
           </el-form-item>
         </el-form>
       </div>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="createSessionDialogVisible = false">Cancel</el-button>
+          <el-button @click="createSessionDialogVisible = false">{{
+            t('common.cancel')
+          }}</el-button>
           <el-button type="primary" :loading="creating" @click="handleCreateSession">
-            Create
+            {{ t('home.create') }}
           </el-button>
         </span>
       </template>

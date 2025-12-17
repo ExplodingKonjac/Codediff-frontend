@@ -14,6 +14,9 @@ import {
   Select as SelectIcon,
 } from '@element-plus/icons-vue'
 import { formatDate } from '@/utils/date'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   testcase: {
@@ -133,7 +136,7 @@ const handleContentClick = (event) => {
           </div>
           <div class="min-w-0 flex-1">
             <div class="font-medium text-gray-800 truncate text-lg" :title="testcase.input">
-              {{ testcase.input || 'No input data' }}
+              {{ testcase.input || t('testcase.noInput') }}
             </div>
             <div class="flex items-center gap-2 mt-1 text-sm">
               <span class="font-medium font-mono" :class="statusConfig.color">{{
@@ -171,13 +174,13 @@ const handleContentClick = (event) => {
           <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div class="flex items-center gap-2 p-3 bg-gray-50 border-b border-gray-100">
               <el-icon size="18" class="text-gray-600"><DocumentIcon /></el-icon>
-              <span class="font-medium text-gray-700">Status Details</span>
+              <span class="font-medium text-gray-700">{{ t('testcase.statusDetails') }}</span>
             </div>
             <div class="p-3 space-y-2">
               <div class="flex items-start gap-2">
                 <el-icon size="16" class="mt-0.5 text-blue-600"><CircleCheckIcon /></el-icon>
                 <div>
-                  <span class="text-sm text-gray-500">Status:</span>
+                  <span class="text-sm text-gray-500">{{ t('testcase.status') }}</span>
                   <span class="ml-2 font-medium" :class="statusConfig.color">{{
                     statusConfig.label
                   }}</span>
@@ -186,7 +189,7 @@ const handleContentClick = (event) => {
               <div class="flex items-start gap-2">
                 <el-icon size="16" class="mt-0.5 text-gray-600"><InfoFilledIcon /></el-icon>
                 <div>
-                  <span class="text-sm text-gray-500">Judgement:</span>
+                  <span class="text-sm text-gray-500">{{ t('testcase.judgement') }}</span>
                   <span class="ml-2 font-medium text-gray-600">{{
                     testcase.detail != null ? testcase.detail : 'N/A'
                   }}</span>
@@ -195,7 +198,7 @@ const handleContentClick = (event) => {
               <div class="flex items-start gap-2">
                 <el-icon size="16" class="mt-0.5 text-blue-600"><TimerIcon /></el-icon>
                 <div>
-                  <span class="text-sm text-gray-500">User Time:</span>
+                  <span class="text-sm text-gray-500">{{ t('testcase.userTime') }}</span>
                   <span class="ml-2 font-medium">{{
                     testcase.time_used != null ? testcase.time_used.toFixed(2) + 'ms' : 'N/A'
                   }}</span>
@@ -204,7 +207,7 @@ const handleContentClick = (event) => {
               <div class="flex items-start gap-2">
                 <el-icon size="16" class="mt-0.5 text-purple-600"><DocumentIcon /></el-icon>
                 <div>
-                  <span class="text-sm text-gray-500">Memory:</span>
+                  <span class="text-sm text-gray-500">{{ t('testcase.memory') }}</span>
                   <span class="ml-2 font-medium">{{
                     testcase.memory_used != null ? testcase.memory_used.toFixed(2) + 'MB' : 'N/A'
                   }}</span>
@@ -213,7 +216,7 @@ const handleContentClick = (event) => {
               <div class="flex items-start gap-2">
                 <el-icon size="16" class="mt-0.5 text-gray-600"><RefreshIcon /></el-icon>
                 <div>
-                  <span class="text-sm text-gray-500">Created:</span>
+                  <span class="text-sm text-gray-500">{{ t('testcase.created') }}</span>
                   <span class="ml-2 font-medium text-gray-600">{{
                     formatDate(testcase.created_at)
                   }}</span>
@@ -226,13 +229,13 @@ const handleContentClick = (event) => {
           <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div class="flex items-center gap-2 p-3 bg-gray-50 border-b border-gray-100">
               <el-icon size="18" class="text-blue-600"><ReadingIcon /></el-icon>
-              <span class="font-medium text-gray-700">Input Data</span>
+              <span class="font-medium text-gray-700">{{ t('testcase.inputData') }}</span>
             </div>
             <div
               class="p-3 max-h-48 overflow-y-auto font-mono text-sm whitespace-pre-wrap text-gray-700"
             >
               <div v-if="testcase.input">{{ testcase.input }}</div>
-              <div v-else class="text-gray-400 italic">No input data available</div>
+              <div v-else class="text-gray-400 italic">{{ t('testcase.noInputAvailable') }}</div>
             </div>
           </div>
 
@@ -245,14 +248,14 @@ const handleContentClick = (event) => {
               <el-icon size="18" class="text-red-600"
                 ><component :is="statusConfig.icon"
               /></el-icon>
-              <span class="font-medium text-gray-700">User Output</span>
+              <span class="font-medium text-gray-700">{{ t('testcase.userOutput') }}</span>
             </div>
             <div
               class="p-3 max-h-48 overflow-y-auto font-mono text-sm whitespace-pre-wrap"
               :class="`${statusConfig.bgColor} ${statusConfig.color}`"
             >
               <div v-if="testcase.output">{{ testcase.output }}</div>
-              <div v-else class="text-gray-400 italic">No output available</div>
+              <div v-else class="text-gray-400 italic">{{ t('testcase.noOutput') }}</div>
             </div>
           </div>
 
@@ -260,13 +263,13 @@ const handleContentClick = (event) => {
           <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div class="flex items-center gap-2 p-3 bg-green-50 border-b border-green-100">
               <el-icon size="18" class="text-green-600"><SelectIcon /></el-icon>
-              <span class="font-medium text-gray-700">Standard Output</span>
+              <span class="font-medium text-gray-700">{{ t('testcase.standardOutput') }}</span>
             </div>
             <div
               class="p-3 max-h-48 overflow-y-auto font-mono text-sm whitespace-pre-wrap text-green-700 bg-green-50"
             >
               <div v-if="testcase.answer">{{ testcase.answer }}</div>
-              <div v-else class="text-gray-400 italic">No answer available</div>
+              <div v-else class="text-gray-400 italic">{{ t('testcase.noAnswer') }}</div>
             </div>
           </div>
         </div>

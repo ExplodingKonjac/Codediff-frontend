@@ -2,11 +2,13 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getSessionById, updateSession, deleteSession } from '@/api/sessions'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 
 export function useSession() {
+  const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
-  
+
   const sessionId = ref(route.params.id)
   const session = ref(null)
   const loading = ref(true)
@@ -31,23 +33,38 @@ export function useSession() {
 
       // Ensure data structure integrity (defaults)
       if (!sessionData.user_code) {
-        sessionData.user_code = { lang: 'cpp', std: 'c++17', content: '// Enter your code here\n#include <iostream>\nusing namespace std;\n\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}' }
+        sessionData.user_code = {
+          lang: 'cpp',
+          std: 'c++17',
+          content:
+            '// Enter your code here\n#include <iostream>\nusing namespace std;\n\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}',
+        }
       }
       if (!sessionData.std_code) {
-        sessionData.std_code = { lang: 'cpp', std: 'c++17', content: '// Standard solution\n#include <iostream>\nusing namespace std;\n\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}' }
+        sessionData.std_code = {
+          lang: 'cpp',
+          std: 'c++17',
+          content:
+            '// Standard solution\n#include <iostream>\nusing namespace std;\n\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}',
+        }
       }
       if (!sessionData.gen_code) {
-        sessionData.gen_code = { lang: 'cpp', std: 'c++17', content: '// Test data generator\n#include <iostream>\n#include <random>\nusing namespace std;\n\nint main() {\n    random_device rd;\n    mt19937 gen(rd());\n    uniform_int_distribution<> dis(1, 100);\n    \n    int a = dis(gen);\n    int b = dis(gen);\n    cout << a << " " << b << endl;\n    return 0;\n}' }
+        sessionData.gen_code = {
+          lang: 'cpp',
+          std: 'c++17',
+          content:
+            '// Test data generator\n#include <iostream>\n#include <random>\nusing namespace std;\n\nint main() {\n    random_device rd;\n    mt19937 gen(rd());\n    uniform_int_distribution<> dis(1, 100);\n    \n    int a = dis(gen);\n    int b = dis(gen);\n    cout << a << " " << b << endl;\n    return 0;\n}',
+        }
       }
       if (!sessionData.test_cases) {
         sessionData.test_cases = []
       } else {
-        sessionData.test_cases.forEach((tc, i) => tc.id = i + 1)
+        sessionData.test_cases.forEach((tc, i) => (tc.id = i + 1))
       }
 
       session.value = sessionData
     } catch (error) {
-      ElMessage.error(`Failed to load session: ${error.message}`)
+      ElMessage.error(`${t('session.loadFailed')}: ${error.message}`)
       router.push('/')
     } finally {
       loading.value = false
@@ -73,21 +90,21 @@ export function useSession() {
 
       await updateSession(session.value.id, updateData)
       hasUnsavedChanges.value = false
-      ElMessage.success('Session saved successfully')
+      ElMessage.success(t('session.saveSuccess'))
     } catch (error) {
       console.error('Save error:', error)
-      ElMessage.error(`Failed to save session: ${error.message || 'Unknown error'}`)
+      ElMessage.error(`${t('session.saveFailed')}: ${error.message || 'Unknown error'}`)
     }
   }
 
   const editSessionTitle = () => {
-    ElMessageBox.prompt('Enter new session title:', 'Edit Session Title', {
-      confirmButtonText: 'Confirm',
-      cancelButtonText: 'Cancel',
+    ElMessageBox.prompt(t('session.editTitlePrompt'), t('session.editTitleHeader'), {
+      confirmButtonText: t('common.confirm'),
+      cancelButtonText: t('common.cancel'),
       inputValue: session.value?.title || '',
-      inputErrorMessage: 'Title cannot be empty',
+      inputErrorMessage: t('session.titleEmpty'),
       inputValidator: (value) => {
-        if (!value?.trim()) return 'Title cannot be empty'
+        if (!value?.trim()) return t('session.titleEmpty')
         return null
       },
     })
@@ -98,33 +115,33 @@ export function useSession() {
         session.value.title = newTitle
         markUnsaved()
         await saveSession()
-        ElMessage.success('Session title updated successfully')
+        ElMessage.success(t('session.titleUpdateSuccess'))
       })
       .catch(() => {
-        ElMessage.info('Title edit canceled')
+        ElMessage.info(t('session.titleEditCanceled'))
       })
   }
 
   const deleteSessionConfirm = () => {
-    ElMessageBox.confirm(
-      'Are you sure you want to delete this session? All data will be permanently lost.',
-      'Confirm Deletion',
-      { confirmButtonText: 'Delete', cancelButtonText: 'Cancel', type: 'warning' }
-    )
+    ElMessageBox.confirm(t('session.deleteConfirmMessage'), t('session.deleteConfirmTitle'), {
+      confirmButtonText: t('session.confirmDelete'),
+      cancelButtonText: t('session.cancelDelete'),
+      type: 'warning',
+    })
       .then(async () => {
         try {
           await deleteSession(sessionId.value)
-          ElMessage.success('Session deleted successfully')
+          ElMessage.success(t('session.deleteSuccess'))
           router.push('/')
         } catch (error) {
-          ElMessage.error(`Failed to delete session: ${error.message}`)
+          ElMessage.error(`${t('session.deleteFailed')}: ${error.message}`)
         }
       })
-      .catch(() => ElMessage.info('Deletion canceled'))
+      .catch(() => ElMessage.info(t('session.deleteCanceled')))
   }
-  
+
   const cleanup = () => {
-      if (saveTimeout) clearTimeout(saveTimeout)
+    if (saveTimeout) clearTimeout(saveTimeout)
   }
 
   return {
@@ -137,6 +154,6 @@ export function useSession() {
     saveSession,
     editSessionTitle,
     deleteSessionConfirm,
-    cleanup
+    cleanup,
   }
 }

@@ -5,12 +5,12 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { updateSession, deleteSession } from '@/api/sessions'
 import { formatDate } from '@/utils/date'
-// 使用正确的图标导入
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   ArrowRightBold as ArrowRightBoldIcon,
 } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
   session: {
@@ -20,6 +20,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['title-updated', 'session-deleted'])
+const { t } = useI18n()
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -39,15 +40,15 @@ const handleDetail = () => {
 
 const handleEditTitle = async (event) => {
   event.stopPropagation()
-  ElMessageBox.prompt('Enter new title:', 'Edit Session Title', {
-    confirmButtonText: 'Confirm',
-    cancelButtonText: 'Cancel',
+  ElMessageBox.prompt(t('session.editTitlePrompt'), t('session.editTitleHeader'), {
+    confirmButtonText: t('common.confirm'),
+    cancelButtonText: t('common.cancel'),
     inputValue: props.session.title,
-    inputErrorMessage: 'Title cannot be empty',
+    inputErrorMessage: t('session.titleEmpty'),
   })
     .then(async ({ value }) => {
       if (value.trim() === '') {
-        throw new Error('Title cannot be empty')
+        throw new Error(t('session.titleEmpty'))
       }
 
       const newTitle = value.trim()
@@ -56,66 +57,54 @@ const handleEditTitle = async (event) => {
       }
 
       try {
-        // 修复：只更新标题字段
         const updateData = {
           title: newTitle,
         }
 
         await updateSession(props.session.id, updateData)
 
-        // 更新本地数据
         props.session.title = newTitle
-        ElMessage.success('Title updated successfully')
+        ElMessage.success(t('session.titleUpdateSuccess'))
 
-        // 触发事件通知父组件
         emit('title-updated', { id: props.session.id, title: newTitle })
       } catch (error) {
-        ElMessage.error(`Failed to update title: ${error.message}`)
+        ElMessage.error(`${t('common.error')}: ${error.message}`)
       }
     })
     .catch(() => {
-      ElMessage.info('Edit canceled')
+      ElMessage.info(t('session.titleEditCanceled'))
     })
 }
 
 const handleDelete = async (event) => {
   event.stopPropagation()
-  ElMessageBox.confirm(
-    'Are you sure you want to delete this session? All data will be permanently lost.',
-    'Confirm Deletion',
-    {
-      confirmButtonText: 'Delete',
-      cancelButtonText: 'Cancel',
-      type: 'warning',
-    },
-  )
+  ElMessageBox.confirm(t('session.deleteConfirmMessage'), t('session.deleteConfirmTitle'), {
+    confirmButtonText: t('session.confirmDelete'),
+    cancelButtonText: t('session.cancelDelete'),
+    type: 'warning',
+  })
     .then(async () => {
       try {
-        // 修复：调用 API 删除会话
         await deleteSession(props.session.id)
 
-        ElMessage.success('Session deleted successfully')
-        // 修复：通过 emit 通知父组件而不是 window 事件
+        ElMessage.success(t('session.deleteSuccess'))
         emit('session-deleted', { id: props.session.id })
       } catch (error) {
-        ElMessage.error(`Failed to delete session: ${error.message}`)
+        ElMessage.error(`${t('session.deleteFailed')}: ${error.message}`)
       }
     })
     .catch(() => {
-      ElMessage.info('Deletion canceled')
+      ElMessage.info(t('session.deleteCanceled'))
     })
 }
 </script>
 
 <template>
-  <!-- 确保背景为白色，添加内边距 -->
   <div
     class="relative group bg-white rounded-xl shadow-card hover:shadow-card-hover border border-gray-200 overflow-hidden cursor-pointer transition-all duration-300"
     @click="handleDetail"
   >
-    <!-- 关键修正：添加内边距 p-6，并确保背景为白色 -->
     <div class="p-6">
-      <!-- 标题和操作按钮行 -->
       <div class="flex justify-between items-start mb-4">
         <h3 class="text-xl font-bold text-gray-800 truncate pr-4" :title="session.title">
           {{ session.title }}
@@ -127,7 +116,7 @@ const handleDelete = async (event) => {
             circle
             @click.stop="handleEditTitle"
             class="hover:bg-yellow-100 transition-colors"
-            title="Edit title"
+            :title="t('session.editTitle')"
             :icon="EditIcon"
           />
           <el-button
@@ -136,19 +125,19 @@ const handleDelete = async (event) => {
             circle
             @click.stop="handleDelete"
             class="hover:bg-red-100 transition-colors"
-            title="Delete session"
+            :title="t('session.deleteSession')"
             :icon="DeleteIcon"
           />
         </div>
       </div>
 
       <p class="text-gray-600 mb-5 line-clamp-2 min-h-[3.5rem]">
-        {{ session.description || 'No description provided' }}
+        {{ session.description || t('session.noDescription') }}
       </p>
 
       <div class="flex flex-wrap gap-2 mb-5">
         <el-tag type="info" size="small" class="font-medium">
-          {{ session.test_case_count || 0 }} test{{ session.test_case_count > 1 ? 's' : '' }}
+          {{ t('session.testCount', session.test_case_count || 0) }}
         </el-tag>
       </div>
 
@@ -164,17 +153,9 @@ const handleDelete = async (event) => {
           <span class="text-sm text-gray-500">•</span>
           <span class="text-sm text-gray-500">{{ formatDate(session.created_at) }}</span>
         </div>
-
-        <!-- <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-600">Success:</span>
-          <span :class="`font-bold text-lg ${successRateColor}`">
-            {{ session.success_rate }}%
-          </span>
-        </div> -->
       </div>
     </div>
 
-    <!-- 底部装饰条，增强视觉层次 -->
     <div class="h-1.5 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
   </div>
 </template>
@@ -199,6 +180,7 @@ const handleDelete = async (event) => {
 .line-clamp-1 {
   display: -webkit-box;
   -webkit-line-clamp: 1;
+  line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -206,6 +188,7 @@ const handleDelete = async (event) => {
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

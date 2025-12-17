@@ -5,6 +5,9 @@ import {
   Upload as UploadIcon,
   Loading as LoadingIcon,
 } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   modelValue: {
@@ -56,7 +59,7 @@ watch(
     >
       <div class="flex items-center gap-3 font-medium text-lg">
         <el-icon size="18"><TicketsIcon /></el-icon>
-        <span>Problem Description</span>
+        <span>{{ t('session.problemDescription') }}</span>
       </div>
 
       <!-- OCR Upload Button -->
@@ -71,7 +74,7 @@ watch(
           <el-icon v-if="!ocrUploading"><UploadIcon /></el-icon>
           <el-icon v-else class="animate-spin"><LoadingIcon /></el-icon>
         </el-icon>
-        <span class="hidden md:inline">OCR Upload</span>
+        <span class="hidden md:inline">{{ t('session.ocrUpload') }}</span>
       </el-button>
     </div>
     <div class="p-4">
@@ -81,7 +84,7 @@ watch(
         :model-value="modelValue"
         @update:model-value="$emit('update:modelValue', $event)"
         :rows="12"
-        placeholder="Describe the problem requirements and constraints..."
+        :placeholder="t('session.problemPlaceholder')"
         class="!border-none !shadow-none description-textarea"
       />
     </div>

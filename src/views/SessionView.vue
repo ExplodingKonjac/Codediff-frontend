@@ -11,6 +11,9 @@ import {
   SuccessFilled as SuccessFilledIcon,
   User as UserIcon,
 } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 // New Components
 // Async Components
@@ -248,7 +251,7 @@ onMounted(async () => {
   window.addEventListener('beforeunload', (e) => {
     if (hasUnsavedChanges.value) {
       e.preventDefault()
-      e.returnValue = 'You have unsaved changes. Are you sure you want to leave?'
+      e.returnValue = t('common.unsavedChanges')
     }
   })
 })
@@ -275,7 +278,7 @@ onUnmounted(() => {
           <span
             class="truncate max-w-[200px] sm:max-w-[400px] md:max-w-[600px]"
             :title="session?.title"
-            >{{ session?.title || 'Loading session...' }}</span
+            >{{ session?.title || t('session.loading') }}</span
           >
         </h1>
       </div>
@@ -288,7 +291,7 @@ onUnmounted(() => {
           class="px-4 py-2"
           :icon="EditIcon"
         >
-          Save Changes
+          {{ t('session.saveChanges') }}
         </el-button>
 
         <el-button
@@ -297,7 +300,7 @@ onUnmounted(() => {
           class="hidden md:flex px-5 py-2 text-lg font-medium"
           :icon="EditIcon"
         >
-          Edit Title
+          {{ t('session.editTitle') }}
         </el-button>
 
         <el-button
@@ -306,7 +309,7 @@ onUnmounted(() => {
           class="hidden md:flex px-5 py-2 text-lg font-medium"
           :icon="DeleteIcon"
         >
-          Delete Session
+          {{ t('session.deleteSession') }}
         </el-button>
       </div>
     </div>
@@ -328,7 +331,7 @@ onUnmounted(() => {
 
         <!-- 数据生成器 -->
         <CodeBlock
-          title="Generator (C++/testlib)"
+          :title="t('session.generatorTitle')"
           :icon="DataAnalysisIcon"
           header-class="bg-gradient-to-r from-purple-600 to-indigo-700"
           v-model="session.gen_code"
@@ -347,7 +350,7 @@ onUnmounted(() => {
 
         <!-- 标准代码 -->
         <CodeBlock
-          title="Standard Code"
+          :title="t('session.standardTitle')"
           :icon="SuccessFilledIcon"
           header-class="bg-gradient-to-r from-green-600 to-emerald-700"
           v-model="session.std_code"
@@ -366,7 +369,7 @@ onUnmounted(() => {
 
         <!-- 用户代码 -->
         <CodeBlock
-          title="User Code"
+          :title="t('session.userTitle')"
           :icon="UserIcon"
           header-class="bg-gradient-to-r from-blue-600 to-cyan-700"
           v-model="session.user_code"

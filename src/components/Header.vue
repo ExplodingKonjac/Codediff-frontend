@@ -10,24 +10,40 @@ import {
   Setting as SettingIcon,
   Plus as PlusIcon,
   ArrowDownBold as ArrowDownBoldIcon,
+  ArrowDown,
   UserFilled as UserFilledIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   SwitchButton as LogoutIcon,
   Management as ManagementIcon,
 } from '@element-plus/icons-vue'
+import { LinearNewNaturePlanetUniverseInternet as GlobeIcon } from '@element-extended-icon-pack/vue'
+
+import { useI18n } from 'vue-i18n'
+// ... imports
 
 const authStore = useAuthStore()
 const router = useRouter()
+const { t, locale } = useI18n()
+
+const handleLanguageCommand = (command) => {
+  locale.value = command
+  localStorage.setItem('language', command)
+}
+
+const currentLanguageLabel = computed(() => {
+  return locale.value === 'en' ? 'English' : '中文'
+})
+
 const showProfileMenu = ref(false)
 const dropdownVisible = ref(false)
 
 const username = computed(() => authStore.username)
 
 const handleLogout = async () => {
-  ElMessageBox.confirm('Are you sure you want to log out?', 'Confirm Logout', {
-    confirmButtonText: 'Yes',
-    cancelButtonText: 'No',
+  ElMessageBox.confirm(t('auth.logoutConfirm'), t('auth.logoutTitle'), {
+    confirmButtonText: t('common.confirm'),
+    cancelButtonText: t('common.cancel'),
     type: 'warning',
   })
     .then(() => {
@@ -35,7 +51,9 @@ const handleLogout = async () => {
       router.push('/login')
     })
     .catch((reason) => {
-      ElMessage.info(`Logout canceled: ${reason}`)
+      if (reason !== 'cancel') {
+        ElMessage.info(`${t('auth.logoutCanceled')}: ${reason}`)
+      }
     })
 }
 
@@ -59,11 +77,28 @@ const handleNewSession = () => {
       <!-- 左侧: Logo + Title -->
       <div class="flex items-center gap-3 cursor-pointer" @click="router.push('/')">
         <img src="/logo.png" alt="CodeDiff Logo" class="h-10 w-auto" />
-        <div class="text-white text-2xl font-extrabold tracking-wider">CodeDiff</div>
+        <div class="text-white text-2xl font-extrabold tracking-wider">{{ t('header.title') }}</div>
       </div>
 
       <!-- 右侧: 用户信息 -->
       <div class="flex items-center gap-3">
+        <!-- Language Switch -->
+        <el-dropdown trigger="click" @command="handleLanguageCommand">
+          <span
+            class="el-dropdown-link text-white hover:text-blue-100 flex items-center gap-1 cursor-pointer font-bold text-base mr-4 transition-colors"
+          >
+            <el-icon class="mr-1 text-lg"><GlobeIcon /></el-icon>
+            {{ currentLanguageLabel }}
+            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          </span>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="en" :disabled="locale === 'en'">English</el-dropdown-item>
+              <el-dropdown-item command="zh" :disabled="locale === 'zh'">中文</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+
         <!-- Auth Buttons (未登录) -->
         <div v-if="!authStore.isAuthenticated" class="flex items-center gap-3">
           <el-button
@@ -71,14 +106,14 @@ const handleNewSession = () => {
             @click="router.push('/register')"
             class="bg-white text-blue-600 hover:bg-blue-50 transition-all font-medium"
           >
-            Register
+            {{ t('header.register') }}
           </el-button>
           <el-button
             type="success"
             @click="router.push('/login')"
             class="bg-white text-green-600 hover:bg-green-50 transition-all font-medium"
           >
-            Login
+            {{ t('header.login') }}
           </el-button>
         </div>
 
@@ -107,7 +142,7 @@ const handleNewSession = () => {
                 @click="(router.push('/admin'), (dropdownVisible = false))"
               >
                 <el-icon class="text-blue-500 text-lg"><ManagementIcon /></el-icon>
-                <span>Admin Panel</span>
+                <span>{{ t('header.adminPanel') }}</span>
               </div>
 
               <div
@@ -115,7 +150,7 @@ const handleNewSession = () => {
                 @click="handleProfile"
               >
                 <el-icon class="text-blue-500 text-lg"><UserFilledIcon /></el-icon>
-                <span>Profile</span>
+                <span>{{ t('header.profile') }}</span>
               </div>
 
               <div class="border-t border-gray-100 my-1"></div>
@@ -125,7 +160,7 @@ const handleNewSession = () => {
                 @click="handleLogout"
               >
                 <el-icon class="text-lg"><LogoutIcon /></el-icon>
-                <span>Logout</span>
+                <span>{{ t('header.logout') }}</span>
               </div>
             </div>
           </transition>

@@ -6,6 +6,9 @@ import {
   FolderOpened as FolderOpenedIcon,
 } from '@element-plus/icons-vue'
 import TestcaseCard from '@/components/TestcaseCard.vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   testCases: {
@@ -42,7 +45,7 @@ const emit = defineEmits(['retry', 'generate-first'])
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-3">
         <el-icon class="text-blue-500 text-2xl"><DocumentCheckedIcon /></el-icon>
-        <span>History Test Cases ({{ testCases?.length || 0 }})</span>
+        <span>{{ t('testcases.history') }} ({{ testCases?.length || 0 }})</span>
       </h2>
     </div>
 
@@ -52,7 +55,7 @@ const emit = defineEmits(['retry', 'generate-first'])
       class="flex flex-col items-center justify-center bg-red-50 rounded-xl border-2 border-dashed border-red-200 p-6"
     >
       <el-icon class="text-red-500 text-5xl mb-4"><WarningIcon /></el-icon>
-      <h3 class="text-xl font-bold text-red-700 mb-2">Diff Failed</h3>
+      <h3 class="text-xl font-bold text-red-700 mb-2">{{ t('testcases.diffFailed') }}</h3>
       <p class="text-gray-700 mb-4 text-center">{{ failureMessage }}</p>
       <div
         v-if="failureDetail"
@@ -67,7 +70,7 @@ const emit = defineEmits(['retry', 'generate-first'])
         class="mt-6 px-6 py-2"
         :icon="RefreshIcon"
       >
-        Try Again
+        {{ t('testcases.tryAgain') }}
       </el-button>
     </div>
 
@@ -83,7 +86,7 @@ const emit = defineEmits(['retry', 'generate-first'])
       >
         <el-icon class="text-gray-400 text-4xl mb-4"><FolderOpenedIcon /></el-icon>
         <p class="text-lg text-gray-600 mb-2">
-          {{ isGenerating ? 'Generating test cases...' : 'No test cases yet' }}
+          {{ isGenerating ? t('testcases.generating') : t('testcases.noTestCases') }}
         </p>
         <div v-if="isGenerating" class="mt-4">
           <el-skeleton :rows="3" animated class="w-full max-w-md" />
@@ -96,7 +99,7 @@ const emit = defineEmits(['retry', 'generate-first'])
           class="mt-2 px-4 py-2"
           :icon="RefreshIcon"
         >
-          Generate First Test
+          {{ t('testcases.generateFirst') }}
         </el-button>
       </div>
 

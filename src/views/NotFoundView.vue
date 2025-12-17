@@ -1,7 +1,9 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { House as HouseIcon, ArrowLeftBold as ArrowLeftBoldIcon } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const router = useRouter()
 
 const goHome = () => {
@@ -15,9 +17,9 @@ const goHome = () => {
   >
     <div class="text-center max-w-md">
       <div class="text-9xl font-bold text-blue-500 mb-4">404</div>
-      <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">Page Not Found</h1>
+      <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">{{ t('notFound.title') }}</h1>
       <p class="text-lg text-gray-600 mb-8">
-        The page you're looking for doesn't exist or has been moved.
+        {{ t('notFound.message') }}
       </p>
 
       <div class="flex flex-col sm:flex-row gap-4 justify-center">
@@ -28,7 +30,7 @@ const goHome = () => {
           class="flex items-center gap-2 px-6 py-3"
           :icon="HouseIcon"
         >
-          <span>Go to Home</span>
+          <span>{{ t('notFound.goHome') }}</span>
         </el-button>
 
         <el-button
@@ -37,7 +39,7 @@ const goHome = () => {
           class="flex items-center gap-2 px-6 py-3"
           :icon="ArrowLeftBoldIcon"
         >
-          <span>Go Back</span>
+          <span>{{ t('notFound.goBack') }}</span>
         </el-button>
       </div>
 
