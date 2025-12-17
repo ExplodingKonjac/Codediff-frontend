@@ -23,7 +23,8 @@ export function useAI(session, sessionId, markUnsaved) {
     aiStreaming.value[type] = { loading: true, content: '', complete: false }
 
     try {
-      let sseUrl = new URL(`${import.meta.env.VITE_API_URL}/ai/stream-generate`)
+      const baseUrl = import.meta.env.VITE_API_URL.replace(/\/+$/, '')
+      let sseUrl = new URL(`${baseUrl}/ai/stream-generate`)
       sseUrl.searchParams.set('type', type)
       sseUrl.searchParams.set('session_id', sessionId.value)
 

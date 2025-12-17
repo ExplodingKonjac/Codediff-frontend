@@ -160,8 +160,8 @@ watch(
             @click="$emit('stop-generate')"
             class="!h-8 !px-3 !text-sm !bg-red-500/20 hover:!bg-red-500/30 font-medium text-white flex items-center gap-1"
             style="--el-button-text-color: white; --el-button-hover-text-color: white"
-            :icon="LoadingIcon"
           >
+            <el-icon class="animate-spin"><LoadingIcon /></el-icon>
             <span class="hidden md:inline">Generating...</span>
           </el-button>
         </div>
@@ -190,5 +190,17 @@ watch(
 <style scoped>
 :deep(.suggest-widget) {
   visibility: hidden !important;
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
